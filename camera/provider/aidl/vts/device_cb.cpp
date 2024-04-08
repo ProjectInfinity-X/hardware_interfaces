@@ -388,15 +388,16 @@ bool DeviceCb::processCaptureResultLocked(
         // Verify logical camera result metadata
         bool isLogicalCamera =
                 Status::OK == CameraAidlTest::isLogicalMultiCamera(staticMetadataBuffer);
+        camera_metadata_t* collectedMetadata =
+                const_cast<camera_metadata_t*>(request->collectedResult.getAndLock());
+        uint8_t* rawMetadata = reinterpret_cast<uint8_t*>(collectedMetadata);
+        std::vector metadata =
+                std::vector(rawMetadata, rawMetadata + get_camera_metadata_size(collectedMetadata));
         if (isLogicalCamera) {
-            camera_metadata_t* collectedMetadata =
-                    const_cast<camera_metadata_t*>(request->collectedResult.getAndLock());
-            uint8_t* rawMetadata = reinterpret_cast<uint8_t*>(collectedMetadata);
-            std::vector metadata = std::vector(
-                    rawMetadata, rawMetadata + get_camera_metadata_size(collectedMetadata));
             CameraAidlTest::verifyLogicalCameraResult(staticMetadataBuffer, metadata);
-            request->collectedResult.unlock(collectedMetadata);
         }
+        CameraAidlTest::verifyLensIntrinsicsResult(metadata);
+        request->collectedResult.unlock(collectedMetadata);
     }
 
     uint32_t numBuffersReturned = results.outputBuffers.size();
@@ -428,8 +429,8 @@ bool DeviceCb::processCaptureResultLocked(
                                            bufferId,
                                            outputBuffer,
                                            buffer.status,
-                                           ::android::makeFromAidl(buffer.acquireFence),
-                                           ::android::makeFromAidl(buffer.releaseFence)};
+                                           ::android::dupFromAidl(buffer.acquireFence),
+                                           ::android::dupFromAidl(buffer.releaseFence)};
         streamBufferAndTimestamp.timeStamp = systemTime();
         request->resultOutputBuffers.push_back(streamBufferAndTimestamp);
     }

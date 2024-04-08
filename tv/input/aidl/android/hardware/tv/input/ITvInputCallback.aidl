@@ -30,7 +30,22 @@ interface ITvInputCallback {
     void notify(in TvInputEvent event);
     /**
      * Notifies the client that an TV message event has occurred. For possible event types,
-     * check TvMessageEventType.
+     * check {@link android.hardware.tv.input.TvMessageEventType}.
+     *
+     * <p> For implementations of version 1, The first message in a list of messages contained in a
+     * {@link android.hardware.tv.input.TvMessageEvent} should always have a
+     * {@link android.hardware.tv.input.TvMessage#subType} of "device_id",
+     * otherwise the event is discarded. When the subType of a message is "device_id", the ID of
+     * the device that sent the message should be contained in
+     * {@link android.hardware.tv.input.TvMessage#groupId}.
+     *
+     * <p> For version 2 and beyond, the device ID should be contained in
+     * {@link android.hardware.tv.input.TvMessageEvent#deviceId}.
+     *
+     * <p> Invoking this callback for the first time immediately triggers
+     * {@link android.hardware.tv.input.ITvInput#getTvMessageQueueDesc}. It is
+     * expected for the queue to be ready with the relevant messages for the event before this
+     * callback is called.
      *
      * @param event Event passed to the client.
      */

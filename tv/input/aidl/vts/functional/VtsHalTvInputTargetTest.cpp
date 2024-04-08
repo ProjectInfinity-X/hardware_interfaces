@@ -134,6 +134,19 @@ int32_t TvInputAidlTest::getNumNotIn(vector<int32_t>& nums) {
     return result;
 }
 
+bool TvInputAidlTest::isValidHandle(NativeHandle& handle) {
+    if (handle.fds.empty()) {
+        return false;
+    }
+    for (size_t i = 0; i < handle.fds.size(); i++) {
+        int fd = handle.fds[i].get();
+        if (fcntl(fd, F_GETFL) < 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /*
  * GetStreamConfigTest:
  * Calls updateStreamConfigurations() for each existing device
@@ -168,6 +181,8 @@ TEST_P(TvInputAidlTest, OpenAndCloseStreamTest) {
             ALOGD("OpenAndCloseStreamTest: open stream, device_id=%d, stream_id=%d", device_id,
                   stream_id);
             ASSERT_TRUE(tv_input_->openStream(device_id, stream_id, &handle).isOk());
+            ASSERT_TRUE(isValidHandle(handle));
+
             ALOGD("OpenAndCloseStreamTest: close stream, device_id=%d, stream_id=%d", device_id,
                   stream_id);
             ASSERT_TRUE(tv_input_->closeStream(device_id, stream_id).isOk());
@@ -259,12 +274,16 @@ TEST_P(TvInputAidlTest, OpenAnOpenedStreamsTest) {
         return;
     }
     int32_t device_id = stream_config_.keyAt(indices[0]);
-    int32_t stream_id = stream_config_.valueAt(indices[0])[0].streamId;
-
+    vector<TvStreamConfig> streamConfigs = stream_config_.valueAt(indices[0]);
+    if (streamConfigs.empty()) {
+        return;
+    }
+    int32_t stream_id = streamConfigs[0].streamId;
     NativeHandle handle;
 
     ALOGD("OpenAnOpenedStreamsTest: open stream, device_id=%d, stream_id=%d", device_id, stream_id);
     ASSERT_TRUE(tv_input_->openStream(device_id, stream_id, &handle).isOk());
+    ASSERT_TRUE(isValidHandle(handle));
 
     ALOGD("OpenAnOpenedStreamsTest: open stream, device_id=%d, stream_id=%d", device_id, stream_id);
     ASSERT_TRUE(tv_input_->openStream(device_id, stream_id, &handle).getServiceSpecificError() ==
@@ -291,12 +310,57 @@ TEST_P(TvInputAidlTest, CloseStreamBeforeOpenTest) {
         return;
     }
     int32_t device_id = stream_config_.keyAt(indices[0]);
-    int32_t stream_id = stream_config_.valueAt(indices[0])[0].streamId;
+    vector<TvStreamConfig> streamConfigs = stream_config_.valueAt(indices[0]);
+    if (streamConfigs.empty()) {
+        return;
+    }
+    int32_t stream_id = streamConfigs[0].streamId;
 
     ALOGD("CloseStreamBeforeOpenTest: close stream, device_id=%d, stream_id=%d", device_id,
           stream_id);
     ASSERT_TRUE(tv_input_->closeStream(device_id, stream_id).getServiceSpecificError() ==
                 ITvInput::STATUS_INVALID_STATE);
+}
+
+TEST_P(TvInputAidlTest, SetTvMessageEnabledTest) {
+    unique_lock<mutex> lock(mutex_);
+
+    updateAllStreamConfigurations();
+    vector<size_t> indices = getConfigIndices();
+    if (indices.empty()) {
+        return;
+    }
+    int32_t device_id = stream_config_.keyAt(indices[0]);
+    vector<TvStreamConfig> streamConfigs = stream_config_.valueAt(indices[0]);
+    if (streamConfigs.empty()) {
+        return;
+    }
+    int32_t stream_id = streamConfigs[0].streamId;
+    ALOGD("SetTvMessageEnabledTest: device_id=%d, stream_id=%d", device_id, stream_id);
+    tv_input_->setTvMessageEnabled(device_id, stream_id, TvMessageEventType::WATERMARK, true);
+}
+
+TEST_P(TvInputAidlTest, GetTvMessageQueueTest) {
+    unique_lock<mutex> lock(mutex_);
+
+    updateAllStreamConfigurations();
+    vector<size_t> indices = getConfigIndices();
+    if (indices.empty()) {
+        return;
+    }
+    int32_t device_id = stream_config_.keyAt(indices[0]);
+    vector<TvStreamConfig> streamConfigs = stream_config_.valueAt(indices[0]);
+    if (streamConfigs.empty()) {
+        return;
+    }
+    int32_t stream_id = streamConfigs[0].streamId;
+    ALOGD("GetTvMessageQueueTest: device_id=%d, stream_id=%d", device_id, stream_id);
+    MQDescriptor<int8_t, SynchronizedReadWrite> queueDescriptor;
+    AidlMessageQueue<int8_t, SynchronizedReadWrite>* queue;
+    tv_input_->getTvMessageQueueDesc(&queueDescriptor, device_id, stream_id);
+    queue = new (std::nothrow) AidlMessageQueue<int8_t, SynchronizedReadWrite>(queueDescriptor);
+    ASSERT_TRUE(queue->isValid());
+    delete queue;
 }
 
 INSTANTIATE_TEST_SUITE_P(PerInstance, TvInputAidlTest,

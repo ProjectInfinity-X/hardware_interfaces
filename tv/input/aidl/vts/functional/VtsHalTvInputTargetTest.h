@@ -17,6 +17,7 @@
 #pragma once
 
 #include <android/binder_manager.h>
+#include <fcntl.h>
 
 #include <aidl/Gtest.h>
 #include <aidl/Vintf.h>
@@ -37,6 +38,7 @@ using namespace aidl::android::hardware::tv::input;
 using namespace std;
 using ::aidl::android::hardware::common::NativeHandle;
 using ::aidl::android::hardware::common::fmq::MQDescriptor;
+using ::aidl::android::hardware::common::fmq::SynchronizedReadWrite;
 using ::android::AidlMessageQueue;
 
 #define WAIT_FOR_EVENT_TIMEOUT 5
@@ -82,6 +84,9 @@ class TvInputAidlTest : public testing::TestWithParam<string> {
      * Otherwise, returns the smallest missing non-negative integer.
      */
     int32_t getNumNotIn(vector<int32_t>& nums);
+
+    /* Checks if a native handle contains valid file descriptor(s). */
+    bool isValidHandle(NativeHandle& handle);
 
   protected:
     shared_ptr<ITvInput> tv_input_;

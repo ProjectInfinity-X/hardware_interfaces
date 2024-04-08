@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <android-base/logging.h>
 #include <android/binder_manager.h>
 
 #include "radio_config_utils.h"
@@ -22,6 +21,7 @@
 #define ASSERT_OK(ret) ASSERT_TRUE(ret.isOk())
 
 void RadioConfigTest::SetUp() {
+    RadioServiceTest::SetUp();
     std::string serviceName = GetParam();
 
     radio_config = IRadioConfig::fromBinder(
@@ -30,8 +30,6 @@ void RadioConfigTest::SetUp() {
 
     radioRsp_config = ndk::SharedRefBase::make<RadioConfigResponse>(*this);
     ASSERT_NE(nullptr, radioRsp_config.get());
-
-    count_ = 0;
 
     radioInd_config = ndk::SharedRefBase::make<RadioConfigIndication>(*this);
     ASSERT_NE(nullptr, radioInd_config.get());
@@ -56,6 +54,13 @@ void RadioConfigTest::updateSimSlotStatus() {
  * Test IRadioConfig.getHalDeviceCapabilities() for the response returned.
  */
 TEST_P(RadioConfigTest, getHalDeviceCapabilities) {
+    if (telephony_flags::enforce_telephony_feature_mapping()) {
+        if (!deviceSupportsFeature(FEATURE_TELEPHONY)) {
+            GTEST_SKIP() << "Skipping getHalDeviceCapabilities "
+                            "due to undefined FEATURE_TELEPHONY";
+        }
+    }
+
     serial = GetRandomSerialNumber();
     ndk::ScopedAStatus res = radio_config->getHalDeviceCapabilities(serial);
     ASSERT_OK(res);
@@ -68,6 +73,13 @@ TEST_P(RadioConfigTest, getHalDeviceCapabilities) {
  * Test IRadioConfig.getSimSlotsStatus() for the response returned.
  */
 TEST_P(RadioConfigTest, getSimSlotsStatus) {
+    if (telephony_flags::enforce_telephony_feature_mapping()) {
+        if (!deviceSupportsFeature(FEATURE_TELEPHONY_SUBSCRIPTION)) {
+            GTEST_SKIP() << "Skipping getSimSlotsStatus "
+                            "due to undefined FEATURE_TELEPHONY_SUBSCRIPTION";
+        }
+    }
+
     serial = GetRandomSerialNumber();
     ndk::ScopedAStatus res = radio_config->getSimSlotsStatus(serial);
     ASSERT_OK(res);
@@ -80,6 +92,13 @@ TEST_P(RadioConfigTest, getSimSlotsStatus) {
  * Test IRadioConfig.getPhoneCapability() for the response returned.
  */
 TEST_P(RadioConfigTest, getPhoneCapability) {
+    if (telephony_flags::enforce_telephony_feature_mapping()) {
+        if (!deviceSupportsFeature(FEATURE_TELEPHONY)) {
+            GTEST_SKIP() << "Skipping getPhoneCapability "
+                            "due to undefined FEATURE_TELEPHONY";
+        }
+    }
+
     serial = GetRandomSerialNumber();
     ndk::ScopedAStatus res = radio_config->getPhoneCapability(serial);
     ASSERT_OK(res);
@@ -106,6 +125,13 @@ TEST_P(RadioConfigTest, getPhoneCapability) {
  * Test IRadioConfig.setPreferredDataModem() for the response returned.
  */
 TEST_P(RadioConfigTest, setPreferredDataModem) {
+    if (telephony_flags::enforce_telephony_feature_mapping()) {
+        if (!deviceSupportsFeature(FEATURE_TELEPHONY_DATA)) {
+            GTEST_SKIP() << "Skipping setPreferredDataModem "
+                            "due to undefined FEATURE_TELEPHONY_DATA";
+        }
+    }
+
     serial = GetRandomSerialNumber();
     ndk::ScopedAStatus res = radio_config->getPhoneCapability(serial);
     ASSERT_OK(res);
@@ -148,6 +174,13 @@ TEST_P(RadioConfigTest, setPreferredDataModem) {
  * Test IRadioConfig.setPreferredDataModem() with invalid arguments.
  */
 TEST_P(RadioConfigTest, setPreferredDataModem_invalidArgument) {
+    if (telephony_flags::enforce_telephony_feature_mapping()) {
+        if (!deviceSupportsFeature(FEATURE_TELEPHONY_DATA)) {
+            GTEST_SKIP() << "Skipping setPreferredDataModem_invalidArgument "
+                            "due to undefined FEATURE_TELEPHONY_DATA";
+        }
+    }
+
     serial = GetRandomSerialNumber();
     uint8_t modemId = -1;
     ndk::ScopedAStatus res = radio_config->setPreferredDataModem(serial, modemId);
@@ -168,6 +201,13 @@ TEST_P(RadioConfigTest, setPreferredDataModem_invalidArgument) {
  * Test IRadioConfig.setSimSlotsMapping() for the response returned.
  */
 TEST_P(RadioConfigTest, setSimSlotsMapping) {
+    if (telephony_flags::enforce_telephony_feature_mapping()) {
+        if (!deviceSupportsFeature(FEATURE_TELEPHONY_SUBSCRIPTION)) {
+            GTEST_SKIP() << "Skipping setSimSlotsMapping "
+                            "due to undefined FEATURE_TELEPHONY_SUBSCRIPTION";
+        }
+    }
+
     // get slot status and set SIM slots mapping based on the result.
     updateSimSlotStatus();
     if (radioRsp_config->rspInfo.error == RadioError::NONE) {
@@ -229,6 +269,13 @@ TEST_P(RadioConfigTest, setSimSlotsMapping) {
  */
 
 TEST_P(RadioConfigTest, checkPortInfoExistsAndPortActive) {
+    if (telephony_flags::enforce_telephony_feature_mapping()) {
+        if (!deviceSupportsFeature(FEATURE_TELEPHONY_SUBSCRIPTION)) {
+            GTEST_SKIP() << "Skipping checkPortInfoExistsAndPortActive "
+                            "due to undefined FEATURE_TELEPHONY_SUBSCRIPTION";
+        }
+    }
+
     serial = GetRandomSerialNumber();
     ndk::ScopedAStatus res = radio_config->getSimSlotsStatus(serial);
     ASSERT_OK(res);

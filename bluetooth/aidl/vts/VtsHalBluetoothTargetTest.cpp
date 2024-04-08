@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
+#include <VtsCoreUtil.h>
 #include <aidl/Gtest.h>
 #include <aidl/Vintf.h>
 #include <aidl/android/hardware/bluetooth/BnBluetoothHciCallbacks.h>
 #include <aidl/android/hardware/bluetooth/IBluetoothHci.h>
 #include <aidl/android/hardware/bluetooth/IBluetoothHciCallbacks.h>
 #include <aidl/android/hardware/bluetooth/Status.h>
+#include <android-base/properties.h>
 #include <android/binder_auto_utils.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
@@ -67,6 +69,7 @@ using ::bluetooth::hci::ReadLocalVersionInformationBuilder;
 using ::bluetooth::hci::ReadLocalVersionInformationCompleteView;
 
 static constexpr uint8_t kMinLeAdvSetForBt5 = 16;
+static constexpr uint8_t kMinLeAdvSetForBt5FoTv = 10;
 static constexpr uint8_t kMinLeResolvingListForBt5 = 8;
 
 static constexpr size_t kNumHciCommandsBandwidth = 100;
@@ -80,6 +83,40 @@ static constexpr std::chrono::milliseconds kInterfaceCloseDelayMs(200);
 
 // To discard Qualcomm ACL debugging
 static constexpr uint16_t kAclHandleQcaDebugMessage = 0xedc;
+
+static int get_vsr_api_level() {
+  int vendor_api_level =
+      ::android::base::GetIntProperty("ro.vendor.api_level", -1);
+  if (vendor_api_level != -1) {
+    return vendor_api_level;
+  }
+
+  // Android S and older devices do not define ro.vendor.api_level
+  vendor_api_level = ::android::base::GetIntProperty("ro.board.api_level", -1);
+  if (vendor_api_level == -1) {
+    vendor_api_level =
+        ::android::base::GetIntProperty("ro.board.first_api_level", -1);
+  }
+
+  int product_api_level =
+      ::android::base::GetIntProperty("ro.product.first_api_level", -1);
+  if (product_api_level == -1) {
+    product_api_level =
+        ::android::base::GetIntProperty("ro.build.version.sdk", -1);
+    EXPECT_NE(product_api_level, -1) << "Could not find ro.build.version.sdk";
+  }
+
+  // VSR API level is the minimum of vendor_api_level and product_api_level.
+  if (vendor_api_level == -1 || vendor_api_level > product_api_level) {
+    return product_api_level;
+  }
+  return vendor_api_level;
+}
+
+static bool isTv() {
+  return testing::deviceSupportsFeature("android.software.leanback") ||
+         testing::deviceSupportsFeature("android.hardware.type.television");
+}
 
 class ThroughputLogger {
  public:
@@ -185,6 +222,8 @@ class BluetoothAidlTest : public ::testing::TestWithParam<std::string> {
   int wait_for_completed_packets_event(uint16_t handle);
   void send_and_wait_for_cmd_complete(std::unique_ptr<CommandBuilder> cmd,
                                       std::vector<uint8_t>& cmd_complete);
+  void reassemble_sco_loopback_pkt(std::vector<uint8_t>& scoPackets,
+    size_t size);
 
   // A simple test implementation of BluetoothHciCallbacks.
   class BluetoothHciCallbacks
@@ -532,6 +571,11 @@ void BluetoothAidlTest::sendAndCheckSco(int num_packets, size_t size,
     ASSERT_TRUE(
         sco_queue.tryPopWithTimeout(sco_loopback, kWaitForScoDataTimeout));
 
+    if (sco_loopback.size() < size) {
+      // The packets may have been split for USB. Reassemble before checking.
+      reassemble_sco_loopback_pkt(sco_loopback, size);
+    }
+
     ASSERT_EQ(sco_packet, sco_loopback);
   }
   logger.setTotalBytes(num_packets * size * 2);
@@ -664,6 +708,22 @@ void BluetoothAidlTest::send_and_wait_for_cmd_complete(
         static_cast<int>(view.GetOpCode()));
   ASSERT_NO_FATAL_FAILURE(
       wait_for_command_complete_event(view.GetOpCode(), cmd_complete));
+}
+
+// Handle the loopback packet.
+void BluetoothAidlTest::reassemble_sco_loopback_pkt(std::vector<uint8_t>& scoPackets,
+        size_t size) {
+    std::vector<uint8_t> sco_packet_whole;
+    sco_packet_whole.assign(scoPackets.begin(), scoPackets.end());
+    while (size + 3 > sco_packet_whole.size()) {
+      std::vector<uint8_t> sco_packets;
+      ASSERT_TRUE(
+      sco_queue.tryPopWithTimeout(sco_packets, kWaitForScoDataTimeout));
+      sco_packet_whole.insert(sco_packet_whole.end(), sco_packets.begin() + 3,
+          sco_packets.end());
+    }
+    scoPackets.assign(sco_packet_whole.begin(), sco_packet_whole.end());
+    scoPackets[2] = size;
 }
 
 // Empty test: Initialize()/Close() are called in SetUp()/TearDown().
@@ -914,7 +974,7 @@ TEST_P(BluetoothAidlTest, CallInitializeTwice) {
   ASSERT_EQ(status, std::future_status::ready);
 }
 
-TEST_P(BluetoothAidlTest, Cdd_C_12_1_Bluetooth5Requirements) {
+TEST_P(BluetoothAidlTest, Vsr_Bluetooth5Requirements) {
   std::vector<uint8_t> version_event;
   send_and_wait_for_cmd_complete(ReadLocalVersionInformationBuilder::Create(),
                                  version_event);
@@ -959,7 +1019,12 @@ TEST_P(BluetoothAidlTest, Cdd_C_12_1_Bluetooth5Requirements) {
   ASSERT_TRUE(num_adv_set_view.IsValid());
   ASSERT_EQ(::bluetooth::hci::ErrorCode::SUCCESS, num_adv_set_view.GetStatus());
   auto num_adv_set = num_adv_set_view.GetNumberSupportedAdvertisingSets();
-  ASSERT_GE(num_adv_set, kMinLeAdvSetForBt5);
+
+  if (isTv() && get_vsr_api_level() == __ANDROID_API_U__) {
+    ASSERT_GE(num_adv_set, kMinLeAdvSetForBt5FoTv);
+  } else {
+    ASSERT_GE(num_adv_set, kMinLeAdvSetForBt5);
+  }
 
   std::vector<uint8_t> num_resolving_list_event;
   send_and_wait_for_cmd_complete(LeReadResolvingListSizeBuilder::Create(),

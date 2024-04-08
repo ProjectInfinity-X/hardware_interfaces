@@ -84,6 +84,8 @@ class BluetoothAudioSessionControl {
       case SessionType::A2DP_HARDWARE_OFFLOAD_ENCODING_DATAPATH:
       case SessionType::A2DP_HARDWARE_OFFLOAD_DECODING_DATAPATH:
         return AudioConfiguration(CodecConfiguration{});
+      case SessionType::HFP_HARDWARE_OFFLOAD_DATAPATH:
+        return AudioConfiguration(HfpConfiguration{});
       case SessionType::LE_AUDIO_HARDWARE_OFFLOAD_ENCODING_DATAPATH:
       case SessionType::LE_AUDIO_HARDWARE_OFFLOAD_DECODING_DATAPATH:
         return AudioConfiguration(LeAudioConfiguration{});
@@ -92,25 +94,6 @@ class BluetoothAudioSessionControl {
       default:
         return AudioConfiguration(PcmConfiguration{});
     }
-  }
-
-  /***
-   * The control API for the bluetooth_audio module to get current
-   * LE audio connection map
-   ***/
-  static const AudioConfiguration GetLeAudioConnectionMap(
-      const SessionType& session_type) {
-    std::shared_ptr<BluetoothAudioSession> session_ptr =
-        BluetoothAudioSessionInstance::GetSessionInstance(session_type);
-    if ((session_type ==
-             SessionType::LE_AUDIO_HARDWARE_OFFLOAD_ENCODING_DATAPATH ||
-         session_type ==
-             SessionType::LE_AUDIO_HARDWARE_OFFLOAD_DECODING_DATAPATH) &&
-        session_ptr != nullptr) {
-      return session_ptr->GetLeAudioConnectionMap();
-    }
-
-    return AudioConfiguration(LeAudioConfiguration{});
   }
 
   /***
@@ -173,6 +156,26 @@ class BluetoothAudioSessionControl {
     if (session_ptr != nullptr) {
       session_ptr->UpdateSinkMetadata(sink_metadata);
     }
+  }
+
+  static bool UpdateSourceMetadata(const SessionType& session_type,
+                                   const SourceMetadata& source_metadata) {
+    std::shared_ptr<BluetoothAudioSession> session_ptr =
+        BluetoothAudioSessionInstance::GetSessionInstance(session_type);
+    if (session_ptr != nullptr) {
+      return session_ptr->UpdateSourceMetadata(source_metadata);
+    }
+    return false;
+  }
+
+  static bool UpdateSinkMetadata(const SessionType& session_type,
+                                 const SinkMetadata& sink_metadata) {
+    std::shared_ptr<BluetoothAudioSession> session_ptr =
+        BluetoothAudioSessionInstance::GetSessionInstance(session_type);
+    if (session_ptr != nullptr) {
+      return session_ptr->UpdateSinkMetadata(sink_metadata);
+    }
+    return false;
   }
 
   static std::vector<LatencyMode> GetSupportedLatencyModes(

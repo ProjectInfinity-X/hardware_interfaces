@@ -263,11 +263,6 @@ struct RSA_Delete {
     void operator()(RSA* p) { RSA_free(p); }
 };
 
-X509* parse_cert_blob(const hidl_vec<uint8_t>& blob) {
-    const uint8_t* p = blob.data();
-    return d2i_X509(nullptr, &p, blob.size());
-}
-
 bool verify_chain(const hidl_vec<hidl_vec<uint8_t>>& chain, const std::string& msg,
                   const std::string& signature) {
     {
@@ -335,27 +330,6 @@ bool verify_chain(const hidl_vec<hidl_vec<uint8_t>>& chain, const std::string& m
     }
 
     return true;
-}
-
-// Extract attestation record from cert. Returned object is still part of cert; don't free it
-// separately.
-ASN1_OCTET_STRING* get_attestation_record(X509* certificate) {
-    ASN1_OBJECT_Ptr oid(OBJ_txt2obj(kAttestionRecordOid, 1 /* dotted string format */));
-    EXPECT_TRUE(!!oid.get());
-    if (!oid.get()) return nullptr;
-
-    int location = X509_get_ext_by_OBJ(certificate, oid.get(), -1 /* search from beginning */);
-    EXPECT_NE(-1, location) << "Attestation extension not found in certificate";
-    if (location == -1) return nullptr;
-
-    X509_EXTENSION* attest_rec_ext = X509_get_ext(certificate, location);
-    EXPECT_TRUE(!!attest_rec_ext)
-        << "Found attestation extension but couldn't retrieve it?  Probably a BoringSSL bug.";
-    if (!attest_rec_ext) return nullptr;
-
-    ASN1_OCTET_STRING* attest_rec = X509_EXTENSION_get_data(attest_rec_ext);
-    EXPECT_TRUE(!!attest_rec) << "Attestation extension contained no data";
-    return attest_rec;
 }
 
 bool tag_in_list(const KeyParameter& entry) {
@@ -2475,10 +2449,11 @@ TEST_P(EncryptionOperationsTest, RsaNoPaddingTooLarge) {
     EVP_PKEY_Ptr pkey(d2i_PUBKEY(nullptr /* alloc new */, &p, exported.size()));
     RSA_Ptr rsa(EVP_PKEY_get1_RSA(pkey.get()));
 
-    size_t modulus_len = BN_num_bytes(rsa->n);
+    const BIGNUM* n = RSA_get0_n(rsa.get());
+    size_t modulus_len = BN_num_bytes(n);
     ASSERT_EQ(2048U / 8, modulus_len);
     std::unique_ptr<uint8_t[]> modulus_buf(new uint8_t[modulus_len]);
-    BN_bn2bin(rsa->n, modulus_buf.get());
+    BN_bn2bin(n, modulus_buf.get());
 
     // The modulus is too big to encrypt.
     string message(reinterpret_cast<const char*>(modulus_buf.get()), modulus_len);
@@ -2490,10 +2465,12 @@ TEST_P(EncryptionOperationsTest, RsaNoPaddingTooLarge) {
     EXPECT_EQ(ErrorCode::INVALID_ARGUMENT, Finish(message, &result));
 
     // One smaller than the modulus is okay.
-    BN_sub(rsa->n, rsa->n, BN_value_one());
-    modulus_len = BN_num_bytes(rsa->n);
+    BIGNUM_Ptr n_minus_1(BN_new());
+    ASSERT_TRUE(n_minus_1);
+    ASSERT_TRUE(BN_sub(n_minus_1.get(), n, BN_value_one()));
+    modulus_len = BN_num_bytes(n_minus_1.get());
     ASSERT_EQ(2048U / 8, modulus_len);
-    BN_bn2bin(rsa->n, modulus_buf.get());
+    BN_bn2bin(n_minus_1.get(), modulus_buf.get());
     message = string(reinterpret_cast<const char*>(modulus_buf.get()), modulus_len);
     EXPECT_EQ(ErrorCode::OK, Begin(KeyPurpose::ENCRYPT, params));
     EXPECT_EQ(ErrorCode::OK, Finish(message, &result));

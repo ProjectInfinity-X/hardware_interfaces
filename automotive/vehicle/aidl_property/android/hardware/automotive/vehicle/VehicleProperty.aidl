@@ -169,7 +169,7 @@ enum VehicleProperty {
      *  int32Values[4] = wheel base
      *  int32Values[5] = track width front
      *  int32Values[6] = track width rear
-     *  int32Values[7] = curb to curb turning radius
+     *  int32Values[7] = curb to curb turning diameter
      *
      * @change_mode VehiclePropertyChangeMode.STATIC
      * @access VehiclePropertyAccess.READ
@@ -345,6 +345,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     FUEL_DOOR_OPEN = 0x0308 + 0x10000000 + 0x01000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:BOOLEAN
@@ -383,6 +384,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     EV_CHARGE_PORT_OPEN = 0x030A + 0x10000000 + 0x01000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:BOOLEAN
@@ -419,19 +421,33 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.CONTINUOUS
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @unit VehicleUnit:METER
      */
     RANGE_REMAINING = 0x0308 + 0x10000000 + 0x01000000
             + 0x00600000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:FLOAT
     /**
+     * EV battery average temperature
+     *
+     * Exposes the temperature of the battery in an EV. If multiple batteries exist in the EV, or
+     * multiple temperature sensors exist, this property should be set to the mean or a meaningful
+     * weighted average that best represents the overall temperature of the battery system.
+     *
+     * @change_mode VehiclePropertyChangeMode.CONTINUOUS
+     * @access VehiclePropertyAccess.READ
+     * @unit VehicleUnit:CELSIUS
+     */
+    EV_BATTERY_AVERAGE_TEMPERATURE =
+            0x030E + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.FLOAT,
+    /**
      * Tire pressure
      *
      * Each tires is identified by its areaConfig.areaId config and their
      * minFloatValue/maxFloatValue are used to store OEM recommended pressure
-     * range.
-     * The Min value in the areaConfig data represents the lower bound of
+     * range. The minFloatValue and maxFloatValue in VehicleAreaConfig must be defined.
+     * The minFloatValue in the areaConfig data represents the lower bound of
      * the recommended tire pressure.
-     * The Max value in the areaConfig data represents the upper bound of
+     * The maxFloatValue in the areaConfig data represents the upper bound of
      * the recommended tire pressure.
      * For example:
      * The following areaConfig indicates the recommended tire pressure
@@ -476,9 +492,26 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     ENGINE_IDLE_AUTO_STOP_ENABLED =
             0x0320 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
+    /**
+     * Impact detected.
+     *
+     * Bit flag property to relay information on whether an impact has occurred on a particular side
+     * of the vehicle as described through the ImpactSensorLocation enum. As a bit flag property,
+     * this property can be set to multiple ORed together values of the enum when necessary.
+     *
+     * For the global area ID (0), the VehicleAreaConfig#supportedEnumValues array must be defined
+     * unless all bit flags of ImpactSensorLocation are supported.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     * @data_enum ImpactSensorLocation
+     */
+    IMPACT_DETECTED =
+            0x0330 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
     /**
      * Currently selected gear
      *
@@ -552,15 +585,15 @@ enum VehicleProperty {
      * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All values between
      * minInt32Value and maxInt32Value must be supported. The minInt32Value must be 0.
      *
-     * The maxInt32Value in default area's VehicleAreaConfig indicates the maximum amount of energy
-     * regenerated from braking. The minInt32Value in default area's VehicleAreaConfig indicates no
-     * regenerative braking.
+     * The maxInt32Value indicates the maximum amount of energy regenerated from braking. The
+     * minInt32Value indicates no regenerative braking.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     EV_BRAKE_REGENERATION_LEVEL =
             0x040C + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
@@ -649,10 +682,50 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum EvStoppingMode
      */
     EV_STOPPING_MODE =
             0x040D + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
+    /**
+     * Enable or disable Electronic Stability Control (ESC).
+     *
+     * Set true to enable ESC and false to disable ESC. When ESC is enabled, a system in the vehicle
+     * should be controlling the tires during instances with high risk of skidding to actively
+     * prevent the same from happening.
+     *
+     * In general, ELECTRONIC_STABILITY_CONTROL_ENABLED should always return true or false. If the
+     * feature is not available due to some temporary state, such as the vehicle speed being too
+     * high, that information must be conveyed through the ErrorState values in the
+     * ELECTRONIC_STABILITY_CONTROL_STATE property.
+     *
+     * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
+     * implement it as VehiclePropertyAccess.READ only.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
+     */
+    ELECTRONIC_STABILITY_CONTROL_ENABLED =
+            0x040E + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
+    /**
+     * Electronic Stability Control (ESC) state.
+     *
+     * Returns the current state of ESC. This property must always return a valid state defined in
+     * ElectronicStabilityControlState or ErrorState. It must not surface errors through StatusCode
+     * and must use the supported error states instead.
+     *
+     * For the global area ID (0), the VehicleAreaConfig#supportedEnumValues array must be defined
+     * unless all states of both ElectronicStabilityControlState (including OTHER, which is not
+     * recommended) and ErrorState are supported.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     * @data_enum ElectronicStabilityControlState
+     * @data_enum ErrorState
+     */
+    ELECTRONIC_STABILITY_CONTROL_STATE =
+            0x040F + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
     /**
      * HVAC Properties
      *
@@ -697,15 +770,25 @@ enum VehicleProperty {
      *     and passenger side, an alternative mapping would be:
      *      - ROW_1_LEFT
      *      - ROW_1_RIGHT
-     *
-     *
+     */
+
+    /**
      * Fan speed setting
+     *
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the lowest fan speed.
+     * The maxInt32Value indicates the highest fan speed.
+     *
+     * This property is not in any particular unit but in a specified range of relative speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_FAN_SPEED = 0x0500 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
@@ -717,6 +800,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleHvacFanDirection
      */
     HVAC_FAN_DIRECTION = 0x0501 + 0x10000000 + 0x05000000
@@ -756,6 +840,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @unit VehicleUnit:CELSIUS
      */
     HVAC_TEMPERATURE_SET = 0x0503 + 0x10000000 + 0x05000000
@@ -768,6 +853,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_DEFROSTER = 0x0504 + 0x10000000 + 0x03000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:WINDOW,VehiclePropertyType:BOOLEAN
@@ -779,6 +865,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @config_flags Supported areaIds
      */
     HVAC_AC_ON = 0x0505 + 0x10000000 + 0x05000000
@@ -796,6 +883,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_MAX_AC_ON = 0x0506 + 0x10000000 + 0x05000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:BOOLEAN
@@ -818,6 +906,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_MAX_DEFROST_ON = 0x0507 + 0x10000000 + 0x05000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:BOOLEAN
@@ -834,6 +923,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_RECIRC_ON = 0x0508 + 0x10000000 + 0x05000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:BOOLEAN
@@ -872,6 +962,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_DUAL_ON = 0x0509 + 0x10000000 + 0x05000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:BOOLEAN
@@ -893,25 +984,29 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_AUTO_ON = 0x050A + 0x10000000 + 0x05000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:BOOLEAN
     /**
      * Seat heating/cooling
      *
-     * Negative values indicate cooling.
-     * 0 indicates off.
-     * Positive values indicate heating.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
      *
-     * Some vehicles may have multiple levels of heating and cooling. The
-     * min/max range defines the allowable range and number of steps in each
-     * direction.
+     * The maxInt32Value indicates the maximum seat temperature heating setting.
+     * The minInt32Value must be 0, unless the vehicle supports seat cooling as well. In this case,
+     * minInt32Value indicates the maximum seat temperature cooling setting.
+     *
+     * This property is not in any particular unit, but in a specified range of relative temperature
+     * settings.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_SEAT_TEMPERATURE = 0x050B + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
@@ -919,31 +1014,45 @@ enum VehicleProperty {
      * Side Mirror Heat
      *
      * Increasing values denote higher heating levels for side mirrors.
-     * The Max value in the config data represents the highest heating level.
-     * The Min value in the config data MUST be zero and indicates no heating.
+     *
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value in the config data represents the maximum heating level.
+     * The minInt32Value in the config data MUST be zero and indicates no heating.
+     *
+     * This property is not in any particular unit but in a specified range of relative heating
+     * settings.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_SIDE_MIRROR_HEAT = 0x050C + 0x10000000 + 0x04000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:MIRROR,VehiclePropertyType:INT32
     /**
      * Steering Wheel Heating/Cooling
      *
-     * Sets the amount of heating/cooling for the steering wheel
-     * config data Min and Max MUST be set appropriately.
-     * Positive value indicates heating.
-     * Negative value indicates cooling.
-     * 0 indicates temperature control is off.
+     * Sets the amount of heating/cooling for the steering wheel.
+     *
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value indicates the maximum steering wheel heating setting.
+     * The minInt32Value should be 0, unless the vehicle supports steering wheel cooling as well. In
+     * such a case, the minInt32Value indicates the maximum steering wheel cooling setting.
+     *
+     * This property is not in any particular unit but in a specified range of heating settings.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_STEERING_WHEEL_HEAT = 0x050D + 0x10000000 + 0x01000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:INT32
@@ -968,6 +1077,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleUnit
      */
     HVAC_TEMPERATURE_DISPLAY_UNITS = 0x050E + 0x10000000 + 0x01000000
@@ -1022,6 +1132,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_POWER_ON = 0x0510 + 0x10000000 + 0x05000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:BOOLEAN
@@ -1056,14 +1167,21 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_AUTO_RECIRC_ON = 0x0512 + 0x10000000 + 0x05000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:BOOLEAN
     /**
      * Seat ventilation
      *
-     * 0 indicates off.
-     * Positive values indicates ventilation level.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value must be 0.
+     * The maxInt32Value indicates the maximum ventilation setting available for the seat.
+     *
+     * This property is not in any particular unit but in the specified range of ventilation
+     * settings.
      *
      * Used by HVAC apps and Assistant to enable, change, or read state of seat
      * ventilation.  This is different than seating cooling. It can be on at the
@@ -1074,6 +1192,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_SEAT_VENTILATION = 0x0513 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
@@ -1085,6 +1204,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HVAC_ELECTRIC_DEFROSTER_ON = 0x0514 + 0x10000000 + 0x03000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:WINDOW,VehiclePropertyType:BOOLEAN
@@ -1148,6 +1268,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleUnit
      */
     DISTANCE_DISPLAY_UNITS = 0x0600 + 0x10000000 + 0x01000000
@@ -1171,6 +1292,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleUnit
      */
     FUEL_VOLUME_DISPLAY_UNITS = 0x0601 + 0x10000000 + 0x01000000
@@ -1195,6 +1317,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleUnit
      */
     TIRE_PRESSURE_DISPLAY_UNITS = 0x0602 + 0x10000000 + 0x01000000
@@ -1219,6 +1342,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleUnit
      */
     EV_BATTERY_DISPLAY_UNITS = 0x0603 + 0x10000000 + 0x01000000
@@ -1235,6 +1359,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     FUEL_CONSUMPTION_UNITS_DISTANCE_OVER_VOLUME = 0x0604 + 0x10000000 + 0x01000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:BOOLEAN
@@ -1257,6 +1382,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     VEHICLE_SPEED_DISPLAY_UNITS = 0x0605 + 0x10000000 + 0x01000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:INT32
@@ -1448,6 +1574,22 @@ enum VehicleProperty {
     PER_DISPLAY_BRIGHTNESS = 0x0A04 + 0x10000000 + 0x01000000
             + 0x00410000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:INT32_VEC
     /**
+     * Valet mode enabled
+     *
+     * This property allows the user to enable/disable valet mode in their vehicle. Valet mode is
+     * a privacy and security setting that prevents an untrusted driver to access more private areas
+     * in the vehicle, such as the glove box or the trunk(s).
+     *
+     * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
+     * implement it as VehiclePropertyAccess.READ only.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
+     */
+    VALET_MODE_ENABLED =
+            0x0A05 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
+    /**
      * Property to feed H/W input events to android
      *
      * int32Values[0] : action defined by VehicleHwKeyInputAction
@@ -1587,8 +1729,16 @@ enum VehicleProperty {
     /**
      * Door position
      *
-     * This is an integer in case a door may be set to a particular position.
-     * Max value indicates fully open, min value (0) indicates fully closed.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the door is closed. The minInt32Value must be 0.
+     * The maxInt32Value indicates the door is fully open.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * closed and fully open positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * Some vehicles (minivans) can open the door electronically. Hence, the
      * ability to write this property.
@@ -1598,17 +1748,32 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     DOOR_POS = 0x0B00 + 0x10000000 + 0x06000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:DOOR,VehiclePropertyType:INT32
     /**
      * Door move
      *
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the door while opening.
+     * The minInt32Value represents the maximum movement speed of the door while closing.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the door reaches the positional limit, the value must reset to 0. If DOOR_MOVE's value is
+     * currently 0, then that means there is no movement currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
+     *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     DOOR_MOVE = 0x0B01 + 0x10000000 + 0x06000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:DOOR,VehiclePropertyType:INT32
@@ -1622,6 +1787,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     DOOR_LOCK = 0x0B02 + 0x10000000 + 0x06000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:DOOR,VehiclePropertyType:BOOLEAN
@@ -1637,58 +1803,110 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     DOOR_CHILD_LOCK_ENABLED =
             0x0B03 + VehiclePropertyGroup.SYSTEM + VehicleArea.DOOR + VehiclePropertyType.BOOLEAN,
     /**
      * Mirror Z Position
      *
-     * Positive value indicates tilt upwards, negative value is downwards
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the mirror is tilted completely downwards. This must be a
+     * non-positive value.
+     * The maxInt32Value indicates the mirror is tilted completely upwards. This must be a
+     * non-negative value.
+     * 0 indicates the mirror is not tilted in either direction.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * fully downward and fully upwards positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     MIRROR_Z_POS = 0x0B40 + 0x10000000 + 0x04000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:MIRROR,VehiclePropertyType:INT32
     /**
      * Mirror Z Move
      *
-     * Positive value indicates tilt upwards, negative value is downwards
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the mirror while tilting upwards.
+     * The minInt32Value represents the maximum movement speed of the mirror while tilting
+     * downwards.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the mirror reaches the positional limit, the value must reset to 0. If MIRROR_Z_MOVE's value
+     * is currently 0, then that means there is no movement currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     MIRROR_Z_MOVE = 0x0B41 + 0x10000000 + 0x04000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:MIRROR,VehiclePropertyType:INT32
     /**
      * Mirror Y Position
      *
-     * Positive value indicate tilt right, negative value is left
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the mirror is tilted completely to the left. This must be a
+     * non-positive value.
+     * The maxInt32Value indicates the mirror is tilted completely to the right. This must be a
+     * non-negative value.
+     * 0 indicates the mirror is not tilted in either direction.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * left extreme and right extreme positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     MIRROR_Y_POS = 0x0B42 + 0x10000000 + 0x04000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:MIRROR,VehiclePropertyType:INT32
     /**
      * Mirror Y Move
      *
-     * Positive value indicate tilt right, negative value is left
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the mirror while tilting right.
+     * The minInt32Value represents the maximum movement speed of the mirror while tilting left.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the mirror reaches the positional limit, the value must reset to 0. If MIRROR_Y_MOVE's value
+     * is currently 0, then that means there is no movement currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     MIRROR_Y_MOVE = 0x0B43 + 0x10000000 + 0x04000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:MIRROR,VehiclePropertyType:INT32
@@ -1702,6 +1920,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     MIRROR_LOCK = 0x0B44 + 0x10000000 + 0x01000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:BOOLEAN
@@ -1715,6 +1934,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     MIRROR_FOLD = 0x0B45 + 0x10000000 + 0x01000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:BOOLEAN
@@ -1731,6 +1951,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
 
     MIRROR_AUTO_FOLD_ENABLED =
@@ -1748,6 +1969,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
 
     MIRROR_AUTO_TILT_ENABLED =
@@ -1756,13 +1978,14 @@ enum VehicleProperty {
     /**
      * Seat memory select
      *
-     * This parameter selects the memory preset to use to select the seat
-     * position. The minValue is always 0, and the maxValue determines the
-     * number of seat preset memory slots available (i.e. numSeatPresets - 1).
+     * This parameter selects the memory preset to use to select the seat position. The
+     * maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All integers between
+     * minInt32Value and maxInt32Value must be supported. The minInt32Value is always 0, and the
+     * maxInt32Value determines the number of seat preset memory slots available (i.e.
+     * numSeatPresets - 1).
      *
-     * For instance, if the driver's seat has 3 memory presets, the maxValue
-     * will be 2. When the user wants to select a preset, the desired preset
-     * number (0, 1, or 2) is set.
+     * For instance, if the driver's seat has 3 memory presets, the maxInt32Value will be 2. When
+     * the user wants to select a preset, the desired preset number (0, 1, or 2) is set.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.WRITE
@@ -1772,9 +1995,10 @@ enum VehicleProperty {
     /**
      * Seat memory set
      *
-     * This setting allows the user to save the current seat position settings
-     * into the selected preset slot.  The maxValue for each seat position
-     * must match the maxValue for SEAT_MEMORY_SELECT.
+     * This setting allows the user to save the current seat position settings into the selected
+     * preset slot. The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. The
+     * minInt32Value must be 0, and the maxInt32Value for each seat position must match the
+     * maxInt32Value for SEAT_MEMORY_SELECT.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.WRITE
@@ -1794,6 +2018,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_BELT_BUCKLED = 0x0B82 + 0x10000000 + 0x05000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:BOOLEAN
@@ -1801,53 +2026,104 @@ enum VehicleProperty {
      * Seatbelt height position
      *
      * Adjusts the shoulder belt anchor point.
-     * Max value indicates highest position
-     * Min value indicates lowest position
+     *
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the seat belt's shoulder anchor is at its lowest position.
+     * The maxInt32Value indicates the seat belt's shoulder anchor is at its highest position.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * lowest and highest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_BELT_HEIGHT_POS = 0x0B83 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Seatbelt height move
      *
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat belt's shoulder anchor
+     * while moving upwards.
+     * The minInt32Value represents the maximum movement speed of the seat belt's shoulder anchor
+     * while moving downwards.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat belt reaches the positional limit, the value must reset to 0. If
+     * SEAT_BELT_HEIGHT_MOVE's value is currently 0, then that means there is no movement currently
+     * occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
+     *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_BELT_HEIGHT_MOVE = 0x0B84 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Seat fore/aft position
      *
-     * Sets the seat position forward (closer to steering wheel) and backwards.
-     * Max value indicates closest to wheel, min value indicates most rearward
-     * position.
+     * Sets the seat position forward and backwards.
+     *
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the seat is at its rearward-most linear position.
+     * The maxInt32Value indicates the seat is at its forward-most linear position.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * closest and farthest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_FORE_AFT_POS = 0x0B85 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Seat fore/aft move
      *
-     * Moves the seat position forward and aft.
+     * This property moves the entire seat forward/backward in the direction that it is facing.
+     *
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat while moving forward.
+     * The minInt32Value represents the maximum movement speed of the seat while moving backward.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat reaches the positional limit, the value must reset to 0. If SEAT_FORE_AFT_MOVE's
+     * value is currently 0, then that means there is no movement currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_FORE_AFT_MOVE = 0x0B86 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
@@ -1855,27 +2131,53 @@ enum VehicleProperty {
      * Seat backrest angle 1 position
      *
      * Backrest angle 1 is the actuator closest to the bottom of the seat.
-     * Max value indicates angling forward towards the steering wheel.
-     * Min value indicates full recline.
+     *
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the seat backrest's full recline position w.r.t the
+     * actuator at the bottom of the seat.
+     * The maxInt32Value indicates the seat backrest's most upright/forward position w.r.t the
+     * actuator at the bottom of the seat.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * full recline and upright/forward positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_BACKREST_ANGLE_1_POS = 0x0B87 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Seat backrest angle 1 move
      *
-     * Moves the backrest forward or recline.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat backrest while angling
+     * forward.
+     * The minInt32Value represents the maximum movement speed of the seat backrest while reclining.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat backrest reaches the positional limit, the value must reset to 0. If
+     * SEAT_BACKREST_ANGLE_1_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_BACKREST_ANGLE_1_MOVE = 0x0B88 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
@@ -1883,55 +2185,103 @@ enum VehicleProperty {
      * Seat backrest angle 2 position
      *
      * Backrest angle 2 is the next actuator up from the bottom of the seat.
-     * Max value indicates angling forward towards the steering wheel.
-     * Min value indicates full recline.
+     *
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the seat backrest's full recline position w.r.t the next
+     * actuator in the backrest from the one at the bottom of the seat (see
+     * SEAT_BACKREST_ANGLE_1_POS for additional details).
+     * The maxInt32Value indicates the seat backrest's most upright/forward position w.r.t the
+     * next actuator in the backrest from the one at the bottom of the seat(see
+     * SEAT_BACKREST_ANGLE_1_POS for additional details).
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * full recline and upright/forward positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_BACKREST_ANGLE_2_POS = 0x0B89 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Seat backrest angle 2 move
      *
-     * Moves the backrest forward or recline.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat backrest while angling
+     * forward.
+     * The minInt32Value represents the maximum movement speed of the seat backrest while reclining.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat backrest reaches the positional limit, the value must reset to 0. If
+     * SEAT_BACKREST_ANGLE_2_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_BACKREST_ANGLE_2_MOVE = 0x0B8A + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Seat height position
      *
-     * Sets the seat height.
-     * Max value indicates highest position.
-     * Min value indicates lowest position.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the seat is in its lowest position.
+     * The maxInt32Value indicates the seat is in its highest position.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * lowest and highest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_HEIGHT_POS = 0x0B8B + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Seat height move
      *
-     * Moves the seat height.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat while moving upward.
+     * The minInt32Value represents the maximum movement speed of the seat while moving downward.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat reaches the positional limit, the value must reset to 0. If SEAT_HEIGHT_MOVE's value
+     * is currently 0, then that means there is no movement currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_HEIGHT_MOVE = 0x0B8C + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
@@ -1939,111 +2289,213 @@ enum VehicleProperty {
      * Seat depth position
      *
      * Sets the seat depth, distance from back rest to front edge of seat.
-     * Max value indicates longest depth position.
-     * Min value indicates shortest position.
+     *
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the seat is in its shallowest position (i.e. the position with
+     * the smallest distance between the front edge of the seat cushion and the rear end of the
+     * seat).
+     * The maxInt32Value indicates the seat is in its deepest position (i.e. the position with the
+     * largest distance between the front edge of the seat cushion and the rear end of the seat).
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * shallowest and deepest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_DEPTH_POS = 0x0B8D + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Seat depth move
      *
-     * Adjusts the seat depth.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat while getting deeper
+     * The minInt32Value represents the maximum movement speed of the seat while getting shallower.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat backrest reaches the positional limit, the value must reset to 0. If
+     * SEAT_DEPTH_MOVE's value is currently 0, then that means there is no movement currently
+     * occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_DEPTH_MOVE = 0x0B8E + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Seat tilt position
      *
-     * Sets the seat tilt.
-     * Max value indicates front edge of seat higher than back edge.
-     * Min value indicates front edge of seat lower than back edge.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the seat bottom is angled at its lowest angular position. This
+     * corresponds to the seat's front edge at its lowest possible position relative to the rear
+     * end of the seat.
+     * The maxInt32Value indicates the seat bottom is angled at its highest angular position. This
+     * corresponds to the seat's front edge at its highest possible position relative to the rear
+     * end of the seat.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * lowest and highest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_TILT_POS = 0x0B8F + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Seat tilt move
      *
-     * Tilts the seat.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the front edge of the seat while
+     * moving upward.
+     * The minInt32Value represents the maximum movement speed of the front edge of the seat while
+     * moving downward.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat bottom reaches the positional limit, the value must reset to 0. If SEAT_TILT_MOVE's
+     * value is currently 0, then that means there is no movement currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_TILT_MOVE = 0x0B90 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Lumber fore/aft position
      *
-     * Pushes the lumbar support forward and backwards
-     * Max value indicates most forward position.
-     * Min value indicates most rearward position.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the lumbar support is in its rearward most position (i.e. least
+     * supportive position).
+     * The maxInt32Value indicates the lumbar support is in its forward most position (i.e. most
+     * supportive position).
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * forward and rearward positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_LUMBAR_FORE_AFT_POS = 0x0B91 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Lumbar fore/aft move
      *
-     * Adjusts the lumbar support.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat's lumbar support while
+     * moving forward.
+     * The minInt32Value represents the maximum movement speed of the seat's lumbar support while
+     * moving backward.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat's lumbar support reaches the positional limit, the value must reset to 0. If
+     * SEAT_LUMBAR_FORE_AFT_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_LUMBAR_FORE_AFT_MOVE = 0x0B92 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Lumbar side support position
      *
-     * Sets the amount of lateral lumbar support.
-     * Max value indicates widest lumbar setting (i.e. least support)
-     * Min value indicates thinnest lumbar setting.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the lumbar side support is in its thinnest position (i.e.
+     * most support).
+     * The maxInt32Value indicates the lumbar side support is in its widest position (i.e.
+     * least support).
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * thinnest and widest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_LUMBAR_SIDE_SUPPORT_POS = 0x0B93 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Lumbar side support move
      *
-     * Adjusts the amount of lateral lumbar support.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat's lumbar side support
+     * while getting wider.
+     * The minInt32Value represents the maximum movement speed of the seat's lumbar side support
+     * while getting thinner.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat's lumbar side support reaches the positional limit, the value must reset to 0. If
+     * SEAT_LUMBAR_SIDE_SUPPORT_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_LUMBAR_SIDE_SUPPORT_MOVE = 0x0B94 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
@@ -2063,6 +2515,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_HEADREST_HEIGHT_POS = 0x0B95 + 0x10000000 + 0x01000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:INT32
@@ -2073,17 +2526,23 @@ enum VehicleProperty {
      * Sets the headrest height for supported seats. VehiclePropConfig.areaConfigs specifies which
      * seats are supported.
      *
-     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All values between
-     * minInt32Value and maxInt32Value must be supported. The maxInt32Value indicates the tallest
-     * setting and the minInt32Value indicates the shortest setting.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
      *
-     * This value is not in any particular unit but in a specified range of steps.
+     * The minInt32Value indicates the headrest is in its lowest position.
+     * The maxInt32Value indicates the headrest is in its highest position.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * lowest and highest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_HEADREST_HEIGHT_POS_V2 =
             0x0BA4 + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.INT32,
@@ -2091,67 +2550,130 @@ enum VehicleProperty {
     /**
      * Headrest height move
      *
-     * Moves the headrest up and down.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat's headrest while moving
+     * up.
+     * The minInt32Value represents the maximum movement speed of the seat's headrest while moving
+     * down.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat's headrest reaches the positional limit, the value must reset to 0. If
+     * SEAT_HEADREST_HEIGHT_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_HEADREST_HEIGHT_MOVE = 0x0B96 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Headrest angle position
      *
-     * Sets the angle of the headrest.
-     * Max value indicates most upright angle.
-     * Min value indicates shallowest headrest angle.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the headrest is in its full recline position.
+     * The maxInt32Value indicates the headrest is in its most upright/forward position.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * full recline and most upright/forward positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_HEADREST_ANGLE_POS = 0x0B97 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Headrest angle move
      *
-     * Adjusts the angle of the headrest
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat's headrest while moving
+     * into an upright/forward position.
+     * The minInt32Value represents the maximum movement speed of the seat's headrest while moving
+     * into a shallow position.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat's headrest reaches the positional limit, the value must reset to 0. If
+     * SEAT_HEADREST_ANGLE_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_HEADREST_ANGLE_MOVE = 0x0B98 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Headrest fore/aft position
      *
-     * Adjusts the headrest forwards and backwards.
-     * Max value indicates position closest to front of car.
-     * Min value indicates position closest to rear of car.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
+     *
+     * The minInt32Value indicates the headrest is in its rearward-most linear position.
+     * The maxInt32Value indicates the headrest is in its forward-most linear position.
+     *
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * forward and rearward positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_HEADREST_FORE_AFT_POS = 0x0B99 + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
     /**
      * Headrest fore/aft move
      *
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value represents the maximum movement speed of the seat's headrest while moving
+     * forward.
+     * The minInt32Value represents the maximum movement speed of the seat's headrest while moving
+     * backward.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the seat's headrest reaches the positional limit, the value must reset to 0. If
+     * SEAT_HEADREST_FORE_AFT_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
+     *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_HEADREST_FORE_AFT_MOVE = 0x0B9A + 0x10000000 + 0x05000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:SEAT,VehiclePropertyType:INT32
@@ -2196,6 +2718,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleLightSwitch
      */
     SEAT_FOOTWELL_LIGHTS_SWITCH =
@@ -2212,6 +2735,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_EASY_ACCESS_ENABLED =
             0x0B9D + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.BOOLEAN,
@@ -2231,105 +2755,147 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_AIRBAG_ENABLED =
             0x0B9E + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.BOOLEAN,
     /**
+     * Seat airbags deployed
+     *
+     * Bit flag property to relay information on which airbags have been deployed in the vehicle at
+     * each seat, vs which ones are currently still armed. If SEAT_AIRBAG_ENABLED is set to false at
+     * a particular areaId, this property should return status code UNAVAILABLE at that areaId.
+     *
+     * Enums apply to each seat, not the global vehicle. For example, VehicleAirbagsLocation#CURTAIN
+     * at the driver seat areaId represents whether the driver side curtain airbag has been
+     * deployed. Multiple bit flags can be set to indicate that multiple different airbags have been
+     * deployed for the seat.
+     *
+     * For each seat area ID, the VehicleAreaConfig#supportedEnumValues array must be defined unless
+     * all states of VehicleAirbagLocation are supported (including OTHER, which is not
+     * recommended).
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     * @data_enum VehicleAirbagLocation
+     */
+    SEAT_AIRBAGS_DEPLOYED =
+            0x0BA5 + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.INT32,
+    /**
      * Represents property for seat’s hipside (bottom cushion’s side) support position.
      *
-     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All integers
-     * between minInt32Value and maxInt32Value are supported.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
      *
-     * maxInt32Value indicates the widest cushion side support setting (i.e. least support).
-     * minInt32Value indicates the thinnest cushion side support setting (i.e most support).
+     * The maxInt32Value indicates the seat cushion side support is in its widest position (i.e.
+     * least support).
+     * The minInt32Value indicates the seat cushion side support is in its thinnest position (i.e.
+     * most support).
      *
-     * This value is not in any particular unit but in a specified range of steps.
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * thinnest and widest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_CUSHION_SIDE_SUPPORT_POS =
             0x0B9F + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.INT32,
     /**
      * Represents property for movement direction and speed of seat cushion side support.
      *
-     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All integers
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
      * between minInt32Value and maxInt32Value must be supported.
      *
-     * maxInt32Value in default area's VehicleAreaConfig represents the maximum movement speed of
-     * the seat cushion side support in the growing wider direction (i.e. less support).
-     * minInt32Value in default area's VehicleAreaConfig represents the maximum movement speed of
-     * the seat cushion side support in the growing thinner direction (i.e. more support).
+     * The maxInt32Value represents the maximum movement speed of the seat cushion side support when
+     * growing wider (i.e. support is decreasing).
+     * The minInt32Value represents the maximum movement speed of the seat cushion side support when
+     * growing thinner (i.e. support is increasing).
      *
      * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
-     * the seat cushion side support reaches the positional limit, the value resets to 0.
+     * the seat cushion side support reaches the positional limit, the value must reset to 0. If
+     * SEAT_CUSHION_SIDE_SUPPORT_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_CUSHION_SIDE_SUPPORT_MOVE =
             0x0BA0 + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.INT32,
     /**
      * Represents property for seat’s lumbar support vertical position.
      *
-     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All integers
-     * between minInt32Value and maxInt32Value are supported.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
      *
-     * maxInt32Value indicates the highest position.
-     * minInt32Value indicates the lowest position.
+     * The maxInt32Value indicates the lumbar support's highest position.
+     * The minInt32Value indicates the lumbar support's lowest position.
      *
-     * This value is not in any particular unit but in a specified range of steps.
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * lowest and highest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_LUMBAR_VERTICAL_POS =
             0x0BA1 + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.INT32,
     /**
      * Represents property for vertical movement direction and speed of seat lumbar support.
      *
-     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All integers
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
      * between minInt32Value and maxInt32Value must be supported.
      *
-     * maxInt32Value in default area's VehicleAreaConfig indicates the lumbar support is moving at
-     * the fastest upward speed.
-     * minInt32Value in default area's VehicleAreaConfig indicates the lumbar support is moving at
-     * the fastest downward speed.
+     * The maxInt32Value indicates the lumbar support is moving at the fastest upward speed.
+     * The minInt32Value indicates the lumbar support is moving at the fastest downward speed.
      *
      * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
-     * the seat cushion side support reaches the positional limit, the value resets to 0.
+     * the seat cushion side support reaches the positional limit, the value must reset to 0. If
+     * SEAT_LUMBAR_VERTICAL_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
      *
-     * This value is not in any particular unit but in a specified range of steps.
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_LUMBAR_VERTICAL_MOVE =
             0x0BA2 + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.INT32,
     /**
      * Represents property that indicates the current walk-in position of the seat.
      *
-     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
-     * The minInt32Value must be 0.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined.
      * All integers between minInt32Value and maxInt32Value must be supported.
      *
-     * minInt32Value indicates the normal seat position.
-     * maxInt32Value indicates the seat is in the full walk-in position.
+     * The minInt32Value indicates the normal seat position. The minInt32Value must be 0.
+     * The maxInt32Value indicates the seat is in the full walk-in position.
      *
      * Values in between minInt32Value and maxInt32Value indicate a transition state between the
      * normal and walk-in positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * The area ID must match the seat that actually moves when the walk-in feature activates, not
      * the intended seat the passengers will sit in.
@@ -2339,9 +2905,28 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     SEAT_WALK_IN_POS =
             0x0BA3 + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.INT32,
+    /**
+     * Seat belt pretensioner deployed.
+     *
+     * Property to relay information on whether the seat belt pretensioner has been deployed for a
+     * particular seat due to a collision. This is different from the regular seat belt tightening
+     * system that continuously adds tension to the seat belts so that they fit snugly around the
+     * person sitting in the seat, nor is it the seat belt retractor system that locks the seat belt
+     * in place during sudden brakes or when the user jerks the seat belt.
+     *
+     * If this property is dependant on the state of other properties, and those properties are
+     * currently in the state that doesn't support this property, this should return
+     * StatusCode#NOT_AVAILABLE
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     */
+    SEAT_BELT_PRETENSIONER_DEPLOYED =
+            0x0BA6 + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.BOOLEAN,
     /**
      * Seat Occupancy
      *
@@ -2357,32 +2942,56 @@ enum VehicleProperty {
     /**
      * Window Position
      *
-     * Min = window up / closed
-     * Max = window down / open
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined.
+     * All integers between minInt32Value and maxInt32Value must be supported.
      *
-     * For a window that may open out of plane (i.e. vent mode of sunroof) this
-     * parameter will work with negative values as follows:
-     *  Max = sunroof completely open
-     *  0 = sunroof closed.
-     *  Min = sunroof vent completely open
+     * The minInt32Value indicates the window is closed/fully open out of plane. If the window
+     * cannot open out of plane, then minInt32Value is the position of the window when fully closed
+     * and must be 0. If the window can open out of plane, the minInt32Value indicates the window
+     * is fully open in its position out of plane and will be a negative value. See the example
+     * below for a more detailed explanation.
+     * The maxInt32Value indicates the window is fully open.
      *
-     *  Note that in this mode, 0 indicates the window is closed.
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * closed/fully open out-of-plane and fully open positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
+     *
+     * For example, this is how the property should work for a window that can move out of plane:
+     *  For a window that may open out of plane (i.e. vent mode of sunroof) this
+     *  parameter will work with negative values as follows:
+     *    Max = sunroof completely open
+     *    0 = sunroof closed.
+     *    Min = sunroof vent completely open
+     *
+     *    Note that in this mode, 0 indicates the window is closed.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     WINDOW_POS = 0x0BC0 + 0x10000000 + 0x03000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:WINDOW,VehiclePropertyType:INT32
     /**
      * Window Move
      *
-     * Max = Open the window as fast as possible
-     * Min = Close the window as fast as possible
-     * Magnitude denotes relative speed.  I.e. +2 is faster than +1 in closing
-     * the window.
+     * The maxInt32Value and minInt32Value in each VehicleAreaConfig must be defined. All integers
+     * between minInt32Value and maxInt32Value must be supported.
+     *
+     * The maxInt32Value indicates the window is opening in plane/closing in the out of plane
+     * direction at the fastest speed.
+     * The minInt32Value indicates the window is closing in plane/opening in the out of plane
+     * direction at the fastest speed.
+     *
+     * Larger absolute values, either positive or negative, indicate a faster movement speed. Once
+     * the window reaches the positional limit, the value must reset to 0. If WINDOW_MOVE's value is
+     * currently 0, then that means there is no movement currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * For a window that may open out of plane (i.e. vent mode of sunroof) this
      * parameter will work as follows:
@@ -2404,6 +3013,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     WINDOW_MOVE = 0x0BC1 + 0x10000000 + 0x03000000
             + 0x00400000, // VehiclePropertyGroup:SYSTEM,VehicleArea:WINDOW,VehiclePropertyType:INT32
@@ -2417,6 +3027,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     WINDOW_LOCK = 0x0BC4 + 0x10000000 + 0x03000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:WINDOW,VehiclePropertyType:BOOLEAN
@@ -2430,8 +3041,9 @@ enum VehicleProperty {
      * When an intermittent wiper setting is selected, this property value must be set to 0 during
      * the "pause" period of the intermittent wiping.
      *
-     * The maxInt32Value for each area ID must specify the longest wiper period. The minInt32Value
-     * must be set to 0 for each area ID.
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. The maxInt32Value
+     * for each area ID must specify the longest wiper period. The minInt32Value must be set to 0
+     * for each area ID.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ
@@ -2481,6 +3093,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum WindshieldWipersSwitch
      */
     WINDSHIELD_WIPERS_SWITCH =
@@ -2494,17 +3107,20 @@ enum VehicleProperty {
      * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All values between
      * minInt32Value and maxInt32Value must be supported.
      *
-     * The maxInt32Value in default area's VehicleAreaConfig indicates the steering wheel position
-     * closest to the driver. The minInt32Value in default area's VehicleAreaConfig indicates the
-     * steering wheel position furthest to the driver.
+     * The maxInt32Value indicates the steering wheel position furthest from the driver.
+     * The minInt32Value indicates the steering wheel position closest to the driver.
      *
-     * This value is not in any particular unit but in a specified range of steps.
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * closest and furthest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     STEERING_WHEEL_DEPTH_POS =
             0x0BE0 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
@@ -2514,19 +3130,23 @@ enum VehicleProperty {
      * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All values between
      * minInt32Value and maxInt32Value must be supported.
      *
-     * The maxInt32Value in default area's VehicleAreaConfig indicates the steering wheel moving
-     * towards the driver. The minInt32Value in default area's VehicleAreaConfig indicates the
-     * steering wheel moving away from the driver. Larger integers, either positive or negative,
-     * indicate a faster movement speed. Once the steering wheel reaches the positional limit, the
-     * value resets to 0.
+     * The maxInt32Value indicates the steering wheel moving away from the driver.
+     * The minInt32Value indicates the steering wheel moving towards the driver.
      *
-     * This value is not in any particular unit but in a specified range of steps.
+     * Larger integers, either positive or negative, indicate a faster movement speed. Once the
+     * steering wheel reaches the positional limit, the value must reset to 0. If
+     * STEERING_WHEEL_DEPTH_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     STEERING_WHEEL_DEPTH_MOVE =
             0x0BE1 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
@@ -2536,17 +3156,20 @@ enum VehicleProperty {
      * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All values between
      * minInt32Value and maxInt32Value must be supported.
      *
-     * The maxInt32Value in default area's VehicleAreaConfig indicates the steering wheel being in
-     * the highest position. The minInt32Value in default area's VehicleAreaConfig indicates the
-     * steering wheel being in the lowest position.
+     * The maxInt32Value indicates the steering wheel being in the highest position.
+     * The minInt32Value indicates the steering wheel being in the lowest position.
      *
-     * This value is not in any particular unit but in a specified range of steps.
+     * Values in between minInt32Value and maxInt32Value indicate a transition state between the
+     * lowest and highest positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     STEERING_WHEEL_HEIGHT_POS =
             0x0BE2 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
@@ -2556,18 +3179,23 @@ enum VehicleProperty {
      * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined. All values between
      * minInt32Value and maxInt32Value must be supported.
      *
-     * The maxInt32Value in default area's VehicleAreaConfig indicates the steering wheel moving
-     * upwards. The minInt32Value in default area's VehicleAreaConfig indicates the steering wheel
-     * moving downwards. Larger integers, either positive or negative, indicate a faster movement
-     * speed. Once the steering wheel reaches the positional limit, the value resets to 0.
+     * The maxInt32Value indicates the steering wheel moving upwards.
+     * The minInt32Value indicates the steering wheel moving downwards.
      *
-     * This value is not in any particular unit but in a specified range of steps.
+     * Larger integers, either positive or negative, indicate a faster movement speed. Once the
+     * steering wheel reaches the positional limit, the value must reset to 0. If
+     * STEERING_WHEEL_HEIGHT_MOVE's value is currently 0, then that means there is no movement
+     * currently occurring.
+     *
+     * This property is not in any particular unit but in a specified range of relative movement
+     * speeds.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     STEERING_WHEEL_HEIGHT_MOVE =
             0x0BE3 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
@@ -2582,6 +3210,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     STEERING_WHEEL_THEFT_LOCK_ENABLED =
             0x0BE4 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -2595,6 +3224,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     STEERING_WHEEL_LOCKED =
             0x0BE5 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -2609,6 +3239,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     STEERING_WHEEL_EASY_ACCESS_ENABLED =
             0x0BE6 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -2616,14 +3247,15 @@ enum VehicleProperty {
      * Property that represents the current position of the glove box door.
      *
      * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
-     * The minInt32Value must be 0.
      * All integers between minInt32Value and maxInt32Value must be supported.
      *
-     * minInt32Value indicates that the glove box door is closed.
-     * maxInt32Value indicates that the glove box door is in the fully open position.
+     * The minInt32Value indicates that the glove box door is closed. The minInt32Value must be 0.
+     * The maxInt32Value indicates that the glove box door is in the fully open position.
      *
      * Values in between minInt32Value and maxInt32Value indicate a transition state between the
      * closed and fully open positions.
+     *
+     * This property is not in any particular unit but in a specified range of relative positions.
      *
      * The area ID must match the seat by which the glove box is intended to be used  (e.g. if the
      * front right dashboard has a glove box embedded in it, then the area ID should be
@@ -2634,6 +3266,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     GLOVE_BOX_DOOR_POS =
             0x0BF0 + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.INT32,
@@ -2652,6 +3285,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     GLOVE_BOX_LOCKED =
             0x0BF1 + VehiclePropertyGroup.SYSTEM + VehicleArea.SEAT + VehiclePropertyType.BOOLEAN,
@@ -2693,6 +3327,151 @@ enum VehicleProperty {
      */
     LOCATION_CHARACTERIZATION =
             0x0C10 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
+
+    /**
+     * Static data for the position of each ultrasonic sensor installed on the vehicle.
+     *
+     * Each individual sensor is identified by its unique VehicleAreaConfig#areaId and returns the
+     * sensor's position formatted as [x, y, z] where:
+     *
+     *     int32Values[0] = x, the position of the sensor along the x-axis relative to the origin of
+     *                      the Android Automotive sensor coordinate frame in millimeters
+     *     int32Values[1] = y, the position of the sensor along the y-axis relative to the origin of
+     *                      the Android Automotive sensor coordinate frame in millimeters.
+     *     int32Values[2] = z, the position of the sensor along the z-axis relative to the origin of
+     *                      the Android Automotive sensor coordinate frame in millimeters.
+     *
+     * If the data is aggregated by another ECU, then OEMs have the option of reporting the same
+     * reading across all included sensors or reporting a virtual representation of all the included
+     * sensors as if they were one sensor.
+     *
+     * @change_mode VehiclePropertyChangeMode.STATIC
+     * @access VehiclePropertyAccess.READ
+     */
+    ULTRASONICS_SENSOR_POSITION = 0x0C20 + VehiclePropertyGroup.SYSTEM + VehicleArea.VENDOR
+            + VehiclePropertyType.INT32_VEC,
+
+    /**
+     * Static data for the orientation of each ultrasonic sensor installed on the vehicle.
+     *
+     * Each individual sensor is identified by its VehicleAreaConfig#areaId and returns the sensor's
+     * orientation formatted as [qw, qx, qy, qz] where:
+     *
+     *     int32Values[0] = qw, the quaternion coefficient w within the quaterinion (w + xi + yj +
+     *                      zk) describing the rotation of the sensor relative to the Android
+     *                      Automotive sensor coordinate frame.
+     *     int32Values[1] = qx, the quaternion coefficient x within the quaterinion (w + xi + yj +
+     *                      zk) describing the rotation of the sensor relative to the Android
+     *                      Automotive sensor coordinate frame.
+     *     int32Values[2] = qy, the quaternion coefficient y within the quaterinion (w + xi + yj +
+     *                      zk) describing the rotation of the sensor relative to the Android
+     *                      Automotive sensor coordinate frame.
+     *     int32Values[3] = qz, the quaternion coefficient z within the quaterinion (w + xi + yj +
+     *                      zk) describing the rotation of the sensor relative to the Android
+     *                      Automotive sensor coordinate frame.
+     *
+     * This assumes each sensor uses the same axes conventions as Android Automotive.
+     *
+     * If the data is aggregated by another ECU, then OEMs have the option of reporting the same
+     * reading across all included sensors or reporting a virtual representation of all the included
+     * sensors as if they were one sensor.
+     *
+     * @change_mode VehiclePropertyChangeMode.STATIC
+     * @access VehiclePropertyAccess.READ
+     */
+    ULTRASONICS_SENSOR_ORIENTATION = 0x0C21 + VehiclePropertyGroup.SYSTEM + VehicleArea.VENDOR
+            + VehiclePropertyType.INT32_VEC,
+
+    /**
+     * Static data for the field of view of each ultrasonic sensor in degrees.
+     *
+     * Each individual sensor is identified by its VehicleAreaConfig#areaId and returns the sensor's
+     * field of view formatted as [horizontal, vertical] where:
+     *
+     *     int32Values[0] = horizontal, the horizontal field of view for the specified ultrasonic
+     *                      sensor in degrees.
+     *     int32Values[1] = vertical, the vertical field of view for the associated specified
+     *                      ultrasonic sensor in degrees.
+     *
+     * This assumes each sensor uses the same axes conventions as Android Automotive.
+     *
+     * If the data is aggregated by another ECU, then OEMs have the option of reporting the same
+     * reading across all included sensors or reporting a virtual representation of all the included
+     * sensors as if they were one sensor.
+     *
+     * @change_mode VehiclePropertyChangeMode.STATIC
+     * @access VehiclePropertyAccess.READ
+     */
+    ULTRASONICS_SENSOR_FIELD_OF_VIEW = 0x0C22 + VehiclePropertyGroup.SYSTEM + VehicleArea.VENDOR
+            + VehiclePropertyType.INT32_VEC,
+
+    /**
+     * Static data for the detection range of each ultrasonic sensor in millimeters.
+     *
+     * Each individual sensor is identified by its VehicleAreaConfig#areaId and returns the sensor's
+     * detection range formatted as [minimum, maximum] where:
+     *
+     *     int32Values[0] = minimum, the minimum range detectable by the ultrasonic sensor in
+     *                      millimeters.
+     *     int32Values[1] = maximum, the maximum range detectable by the ultrasonic sensor in
+     *                      millimeters.
+     *
+     * If the data is aggregated by another ECU, then OEMs have the option of reporting the same
+     * reading across all included sensors or reporting a virtual representation of all the included
+     * sensors as if they were one sensor.
+     *
+     * @change_mode VehiclePropertyChangeMode.STATIC
+     * @access VehiclePropertyAccess.READ
+     */
+    ULTRASONICS_SENSOR_DETECTION_RANGE = 0x0C23 + VehiclePropertyGroup.SYSTEM + VehicleArea.VENDOR
+            + VehiclePropertyType.INT32_VEC,
+
+    /**
+     * Static data for the supported ranges of each ultrasonic sensor in millimeters.
+     *
+     * For ultrasonic sensors that only support readings within a specific range. For example, if
+     * an ultrasonic sensor detects an object at 700mm, but can only report that an object has been
+     * detected between 500mm and 1000mm.
+     *
+     * Each individual sensor is identified by its VehicleAreaConfig#areaId and returns the sensor's
+     * supported ranges formatted as [range_min_1, range_max_1, range_min_2, range_max_2, ...]
+     * where:
+     *
+     *     int32Values[0] = range_min_1, the minimum of one supported range by the specified sensor
+     *                      in millimeters, inclusive.
+     *     int32Values[1] = range_max_1, the maximum of one supported range by the specified sensor
+     *                      in millimeters, inclusive.
+     *     int32Values[2] = range_min_2, the minimum of another supported range by the specified
+     *                      sensor in millimeters, inclusive.
+     *     int32Values[3] = range_max_2, the maximum of another supported range by the specified
+                            sensor in millimeters, inclusive.
+     *
+     * Example:
+     *     - Ultrasonic sensor supports the following ranges:
+     *           - 150mm to 499mm
+     *           - 500mm to 999mm
+     *           - 1000mm to 1500mm
+     *     - The associated supported ranges should be formatted as:
+     *           - int32Values[0] = 150
+     *           - int32Values[1] = 499
+     *           - int32Values[2] = 500
+     *           - int32Values[3] = 999
+     *           - int32Values[4] = 1000
+     *           - int32Values[5] = 1500
+     *
+     * If this property is not defined, all the values within the ULTRASONICS_SENSOR_DETECTION_RANGE
+     * for the specified sensor are assumed to be supported.
+     *
+     * If the data is aggregated by another ECU, then OEMs have the option of reporting the same
+     * reading across all included sensors or reporting a virtual representation of all the included
+     * sensors as if they were one sensor.
+     *
+     * @change_mode VehiclePropertyChangeMode.STATIC
+     * @access VehiclePropertyAccess.READ
+     */
+    ULTRASONICS_SENSOR_SUPPORTED_RANGES = 0x0C24 + VehiclePropertyGroup.SYSTEM + VehicleArea.VENDOR
+            + VehiclePropertyType.INT32_VEC,
+
     /**
      * OBD2 Live Sensor Data
      *
@@ -2871,6 +3650,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleLightSwitch
      */
     HEADLIGHTS_SWITCH = 0x0E10 + 0x10000000 + 0x01000000
@@ -2885,6 +3665,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleLightSwitch
      */
     HIGH_BEAM_LIGHTS_SWITCH = 0x0E11 + 0x10000000 + 0x01000000
@@ -2915,6 +3696,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleLightSwitch
      */
     FOG_LIGHTS_SWITCH = 0x0E12 + 0x10000000 + 0x01000000
@@ -2929,6 +3711,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleLightSwitch
      */
     HAZARD_LIGHTS_SWITCH = 0x0E13 + 0x10000000 + 0x01000000
@@ -2957,6 +3740,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleLightSwitch
      */
     CABIN_LIGHTS_SWITCH = 0x0F02 + 0x10000000 + 0x01000000
@@ -2985,6 +3769,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleLightSwitch
      */
     READING_LIGHTS_SWITCH = 0x0F04 + 0x10000000 + 0x05000000
@@ -3030,6 +3815,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleLightSwitch
      */
     STEERING_WHEEL_LIGHTS_SWITCH =
@@ -3699,6 +4485,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleLightSwitch
      */
     FRONT_FOG_LIGHTS_SWITCH = 0x0F3C + 0x10000000 + 0x01000000
@@ -3730,6 +4517,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum VehicleLightSwitch
      */
     REAR_FOG_LIGHTS_SWITCH = 0x0F3E + 0x10000000 + 0x01000000
@@ -3746,6 +4534,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @unit VehicleUnit:AMPERE
      */
     EV_CHARGE_CURRENT_DRAW_LIMIT = 0x0F3F + 0x10000000 + 0x01000000
@@ -3767,6 +4556,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     EV_CHARGE_PERCENT_LIMIT = 0x0F40 + 0x10000000 + 0x01000000
             + 0x00600000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:FLOAT
@@ -3794,6 +4584,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     EV_CHARGE_SWITCH = 0x0F42 + 0x10000000 + 0x01000000
             + 0x00200000, // VehiclePropertyGroup:SYSTEM,VehicleArea:GLOBAL,VehiclePropertyType:BOOLEAN
@@ -3955,20 +4746,51 @@ enum VehicleProperty {
      * powers on the vehicle. VEHICLE_IN_USE is set to true. After a driving session, user powers
      * off the vehicle, VEHICLE_IN_USE is set to false.
      *
+     * <p>This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
+     * implement it as VehiclePropertyAccess.READ only.
+     *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     VEHICLE_IN_USE =
             0x0F4A + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
 
+    /**
+     * Sends the heartbeat signal to ClusterOS.
+     *
+     * int64[0]: epochTimeNs
+     * int64[1]: the visibility of ClusterUI, 0 - invisible, 1 - visible
+     * bytes: the app specific metadata, this can be empty when ClusterHomeService use the heartbeat
+     *     to deliver the change of the visibility.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.WRITE
+     */
+    CLUSTER_HEARTBEAT =
+            0x0F4B + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.MIXED,
+
+    /**
+     * Current state of vehicle autonomy.
+     *
+     * Defines the level of autonomy currently engaged in the vehicle from the J3016_202104 revision
+     * of the SAE standard levels 0-5, with 0 representing no autonomy and 5 representing full
+     * driving automation. These levels should be used in accordance with the standards defined in
+     * https://www.sae.org/standards/content/j3016_202104/ and
+     * https://www.sae.org/blog/sae-j3016-update
+     *
+     * For the global area ID (0), the VehicleAreaConfig#supportedEnumValues array must be defined
+     * unless all states of VehicleAutonomousState are supported.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     * @data_enum VehicleAutonomousState
+     */
+    VEHICLE_DRIVING_AUTOMATION_CURRENT_LEVEL =
+            0x0F4C + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
+
     /***********************************************************************************************
      * Start of ADAS Properties
-     *
-     * Android is not a safety critical system and is provided as is without any timing guarantees,
-     * representations or warranties. OEMs implementing these properties, and clients using these
-     * properties should ensure they complete any necessary safety reviews, in accordance with
-     * industry standards, to ensure the use of these APIs do not negatively impact driver safety.
-     * Use of any Google APIs will be at the OEM's sole risk.
      *
      * Allocate IDs in range of 0x1000 (inclusive) to 0x1100 (exclusive) for ADAS properties
      **********************************************************************************************/
@@ -3989,6 +4811,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     AUTOMATIC_EMERGENCY_BRAKING_ENABLED =
             0x1000 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -4031,6 +4854,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     FORWARD_COLLISION_WARNING_ENABLED =
             0x1002 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -4070,6 +4894,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     BLIND_SPOT_WARNING_ENABLED =
             0x1004 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -4110,6 +4935,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     LANE_DEPARTURE_WARNING_ENABLED =
             0x1006 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -4154,6 +4980,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     LANE_KEEP_ASSIST_ENABLED =
             0x1008 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -4202,6 +5029,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     LANE_CENTERING_ASSIST_ENABLED =
             0x100A + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -4209,23 +5037,29 @@ enum VehicleProperty {
     /**
      * Lane Centering Assist (LCA) commands.
      *
-     * Commands to activate and suspend LCA. They are only valid when LANE_CENTERING_ASSIST_ENABLED
-     * = true. Otherwise, these commands must return StatusCode#NOT_AVAILABLE or
-     * StatusCode#NOT_AVAILABLE_DISABLED.
+     * Commands to activate and suspend LCA.
      *
-     * When the command ACTIVATE from LaneCenteringAssistCommmand is sent,
+     * When the command ACTIVATE from LaneCenteringAssistCommand is sent,
      * LANE_CENTERING_ASSIST_STATE must be set to LaneCenteringAssistState#ACTIVATION_REQUESTED.
      * When the ACTIVATE command succeeds, LANE_CENTERING_ASSIST_STATE must be set to
      * LaneCenteringAssistState#ACTIVATED. When the command DEACTIVATE from
-     * LaneCenteringAssistCommmand succeeds, LANE_CENTERING_ASSIST_STATE must be set to
+     * LaneCenteringAssistCommand succeeds, LANE_CENTERING_ASSIST_STATE must be set to
      * LaneCenteringAssistState#ENABLED.
      *
      * For the global area ID (0), the VehicleAreaConfig#supportedEnumValues must be defined unless
      * all enum values of LaneCenteringAssistCommand are supported.
      *
+     * When this property is not available because LCA is disabled (i.e.
+     * LANE_CENTERING_ASSIST_ENABLED is false), this property must return
+     * StatusCode#NOT_AVAILABLE_DISABLED. If LANE_CENTERING_ASSIST_STATE is implemented and the
+     * state is set to an ErrorState value, then this property must return a StatusCode that aligns
+     * with the ErrorState value. For example, if LANE_CENTERING_ASSIST_STATE is set to
+     * ErrorState#NOT_AVAILABLE_SPEED_LOW, then this property must return
+     * StatusCode#NOT_AVAILABLE_SPEED_LOW.
+     *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.WRITE
-     * @data_enum LaneCenteringAssistCommmand
+     * @data_enum LaneCenteringAssistCommand
      */
     LANE_CENTERING_ASSIST_COMMAND =
             0x100B + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
@@ -4270,6 +5104,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     EMERGENCY_LANE_KEEP_ASSIST_ENABLED =
             0x100D + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -4313,6 +5148,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     CRUISE_CONTROL_ENABLED =
             0x100F + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -4338,6 +5174,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @data_enum CruiseControlType
      * @data_enum ErrorState
      */
@@ -4374,7 +5211,11 @@ enum VehicleProperty {
      * this property must return StatusCode#INVALID_ARG.
      *
      * When this property is not available because CC is disabled (i.e. CRUISE_CONTROL_ENABLED is
-     * false), this property must return StatusCode#NOT_AVAILABLE_DISABLED.
+     * false), this property must return StatusCode#NOT_AVAILABLE_DISABLED. If CRUISE_CONTROL_STATE
+     * is implemented and the state is set to an ErrorState value, then this property must return a
+     * StatusCode that aligns with the ErrorState value. For example, if CRUISE_CONTROL_STATE is set
+     * to ErrorState#NOT_AVAILABLE_SPEED_LOW, then this property must return
+     * StatusCode#NOT_AVAILABLE_SPEED_LOW.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.WRITE
@@ -4386,14 +5227,18 @@ enum VehicleProperty {
     /**
      * Current target speed for Cruise Control (CC).
      *
-     * OEMs should set the minInt32Value and maxInt32Value values for this property to define the
+     * OEMs should set the minFloatValue and maxFloatValue values for this property to define the
      * min and max target speed values. These values must be non-negative.
      *
      * The maxFloatValue represents the upper bound of the target speed.
      * The minFloatValue represents the lower bound of the target speed.
      *
      * When this property is not available because CC is disabled (i.e. CRUISE_CONTROL_ENABLED is
-     * false), this property must return StatusCode#NOT_AVAILABLE_DISABLED.
+     * false), this property must return StatusCode#NOT_AVAILABLE_DISABLED. If CRUISE_CONTROL_STATE
+     * is implemented and the state is set to an ErrorState value, then this property must return a
+     * StatusCode that aligns with the ErrorState value. For example, if CRUISE_CONTROL_STATE is set
+     * to ErrorState#NOT_AVAILABLE_SPEED_LOW, then this property must return
+     * StatusCode#NOT_AVAILABLE_SPEED_LOW.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ
@@ -4416,13 +5261,18 @@ enum VehicleProperty {
      * writable.
      *
      * When this property is not available because CC is disabled (i.e. CRUISE_CONTROL_ENABLED is
-     * false), this property must return StatusCode#NOT_AVAILABLE_DISABLED.
+     * false), this property must return StatusCode#NOT_AVAILABLE_DISABLED. If CRUISE_CONTROL_STATE
+     * is implemented and the state is set to an ErrorState value, then this property must return a
+     * StatusCode that aligns with the ErrorState value. For example, if CRUISE_CONTROL_STATE is set
+     * to ErrorState#NOT_AVAILABLE_SPEED_LOW, then this property must return
+     * StatusCode#NOT_AVAILABLE_SPEED_LOW.
      *
      * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
      * implement it as VehiclePropertyAccess.READ only.
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      * @unit VehicleUnit:MILLI_SECS
      */
     ADAPTIVE_CRUISE_CONTROL_TARGET_TIME_GAP =
@@ -4435,6 +5285,7 @@ enum VehicleProperty {
      * Returns the measured distance in millimeters between the rear-most point of the leading
      * vehicle and the front-most point of the ACC vehicle.
      *
+     * The maxInt32Value and minInt32Value in VehicleAreaConfig must be defined.
      * The minInt32Value should be 0.
      * The maxInt32Value should be populated with the maximum range the distance sensor can support.
      * This value should be non-negative.
@@ -4444,7 +5295,11 @@ enum VehicleProperty {
      * StatusCode.NOT_AVAILABLE.
      *
      * When this property is not available because CC is disabled (i.e. CRUISE_CONTROL_ENABLED is
-     * false), this property must return StatusCode#NOT_AVAILABLE_DISABLED.
+     * false), this property must return StatusCode#NOT_AVAILABLE_DISABLED. If CRUISE_CONTROL_STATE
+     * is implemented and the state is set to an ErrorState value, then this property must return a
+     * StatusCode that aligns with the ErrorState value. For example, if CRUISE_CONTROL_STATE is set
+     * to ErrorState#NOT_AVAILABLE_SPEED_LOW, then this property must return
+     * StatusCode#NOT_AVAILABLE_SPEED_LOW.
      *
      * @change_mode VehiclePropertyChangeMode.CONTINUOUS
      * @access VehiclePropertyAccess.READ
@@ -4469,6 +5324,7 @@ enum VehicleProperty {
      *
      * @change_mode VehiclePropertyChangeMode.ON_CHANGE
      * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
      */
     HANDS_ON_DETECTION_ENABLED =
             0x1016 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
@@ -4518,6 +5374,277 @@ enum VehicleProperty {
      */
     HANDS_ON_DETECTION_WARNING =
             0x1018 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
+
+    /**
+     * Enable or disable driver drowsiness and attention monitoring.
+     *
+     * Set true to enable driver drowsiness and attention monitoring and false to disable driver
+     * drowsiness and attention monitoring. When driver drowsiness and attention monitoring is
+     * enabled, a system inside the vehicle should be monitoring the drowsiness and attention level
+     * of the driver and warn the driver if needed.
+     *
+     * In general, DRIVER_DROWSINESS_ATTENTION_SYSTEM_ENABLED should always return true or false.
+     * If the feature is not available due to some temporary state, that information must be
+     * conveyed through the ErrorState values in the DRIVER_DROWSINESS_ATTENTION_STATE property.
+     *
+     * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
+     * implement it as VehiclePropertyAccess.READ only.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
+     */
+    DRIVER_DROWSINESS_ATTENTION_SYSTEM_ENABLED =
+            0x1019 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
+
+    /**
+     * Driver drowsiness and attention level state.
+     *
+     * Returns the current detected state of driver drowiness and attention level based on the
+     * Karolinska Sleepiness scale. If alternative measurement methods are used, the value should be
+     * translated to the Karolinska Sleepiness Scale equivalent.
+     *
+     * Generally, this property should return a valid state defined in the
+     * DriverDrowsinessAttentionState or ErrorState. For example, if the feature is not available
+     * due to some temporary state, that information should be conveyed through ErrorState.
+     *
+     * If the vehicle is sending a warning to the user because the driver is too drowsy, the warning
+     * should be surfaced through {@link #DRIVER_DROWSINESS_ATTENTION_WARNING}.
+     *
+     * For the global area ID (0), the VehicleAreaConfig#supportedEnumValues array must be defined
+     * unless all states of both DriverDrowsinessAttentionState (including OTHER, which is not
+     * recommended) and ErrorState are supported.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     * @data_enum DriverDrowsinessAttentionState
+     * @data_enum ErrorState
+     */
+    DRIVER_DROWSINESS_ATTENTION_STATE =
+            0x101A + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
+
+    /**
+     * Enable or disable driver drowsiness and attention warnings.
+     *
+     * Set true to enable driver drowsiness and attention warnings and false to disable driver
+     * drowsiness and attention warnings.
+     *
+     * When driver drowsiness and attention warnings are enabled, the driver drowsiness and
+     * attention monitoring system inside the vehicle should warn the driver when it detects the
+     * driver is drowsy or not attentive.
+     *
+     * In general, DRIVER_DROWSINESS_ATTENTION_WARNING_ENABLED should always return true or false.
+     * If the feature is not available due to some temporary state, that information must be
+     * conveyed through the ErrorState values in the DRIVER_DROWSINESS_ATTENTION_WARNING property.
+     *
+     * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
+     * implement it as VehiclePropertyAccess.READ only.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
+     */
+    DRIVER_DROWSINESS_ATTENTION_WARNING_ENABLED =
+            0x101B + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
+
+    /**
+     * Driver drowsiness and attention warning.
+     *
+     * Returns whether a warning is being sent to the driver for being drowsy or not attentive.
+     *
+     * Generally, this property should return a valid state defined in
+     * DriverDrowsinessAttentionWarning or ErrorState. For example, if the feature is not available
+     * due to some temporary state, that information should be conveyed through an ErrorState.
+     *
+     * For the global area ID (0), the VehicleAreaConfig#supportedEnumValues array must be defined
+     * unless all states of both DriverDrowsinessAttentionWarning (including OTHER, which is not
+     * recommended) and ErrorState are supported.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     * @data_enum DriverDrowsinessAttentionWarning
+     * @data_enum ErrorState
+     */
+    DRIVER_DROWSINESS_ATTENTION_WARNING =
+            0x101C + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
+
+    /**
+     * Enable or disable driver distraction monitoring.
+     *
+     * Set true to enable driver distraction monitoring and false to disable driver
+     * distraction monitoring. When driver distraction monitoring is enabled, a system
+     * inside the vehicle should be monitoring the distraction level of the driver and
+     * warn the driver if needed.
+     *
+     * In general, DRIVER_DISTRACTION_SYSTEM_ENABLED should always return true or false. If the
+     * feature is not available due to some temporary state, that information must be conveyed
+     * through the ErrorState values in the DRIVER_DISTRACTION_STATE property.
+     *
+     * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
+     * implement it as VehiclePropertyAccess.READ only.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
+     */
+    DRIVER_DISTRACTION_SYSTEM_ENABLED =
+            0x101D + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
+
+    /**
+     * Driver distraction state.
+     *
+     * Returns the current detected driver distraction state.
+     *
+     * Generally, this property should return a valid state defined in the DriverDistractionState or
+     * ErrorState. For example, if the feature is not available due to some temporary state, that
+     * information should be conveyed through ErrorState.
+     *
+     * If the vehicle is sending a warning to the user because the driver is too distracted, the
+     * warning should be surfaced through {@link #DRIVER_DISTRACTION_WARNING}.
+     *
+     * For the global area ID (0), the VehicleAreaConfig#supportedEnumValues array must be defined
+     * unless all states of both DriverDistractionState (including OTHER, which is not
+     * recommended) and ErrorState are supported.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     * @data_enum DriverDistractionState
+     * @data_enum ErrorState
+     */
+    DRIVER_DISTRACTION_STATE =
+            0x101E + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
+
+    /**
+     * Enable or disable driver distraction warnings.
+     *
+     * Set true to enable driver distraction warnings and false to disable driver distraction
+     * warnings.
+     *
+     * When driver distraction warnings are enabled, the driver distraction monitoring system inside
+     * the vehicle should warn the driver when it detects the driver is distracted.
+     *
+     * In general, DRIVER_DISTRACTION_WARNING_ENABLED should always return true or false. If the
+     * feature is not available due to some temporary state, that information must be conveyed
+     * through the ErrorState values in the DRIVER_DISTRACTION_WARNING property.
+     *
+     * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
+     * implement it as VehiclePropertyAccess.READ only.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
+     */
+    DRIVER_DISTRACTION_WARNING_ENABLED =
+            0x101F + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
+
+    /**
+     * Driver distraction warning.
+     *
+     * Returns whether a warning is being sent to the driver for being distracted.
+     *
+     * Generally, this property should return a valid state defined in DriverDistractionWarning or
+     * ErrorState. For example, if the feature is not available due to some temporary state, that
+     * information should be conveyed through an ErrorState.
+     *
+     * For the global area ID (0), the VehicleAreaConfig#supportedEnumValues array must be defined
+     * unless all states of both DriverDistractionWarning (including OTHER, which is not
+     * recommended) and ErrorState are supported.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     * @data_enum DriverDistractionWarning
+     * @data_enum ErrorState
+     */
+    DRIVER_DISTRACTION_WARNING =
+            0x1020 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
+
+    /**
+     * Enable or disable Low Speed Collision Warning.
+     *
+     * Set true to enable low speed collision warning and false to disable low speed collision
+     * warning. When low speed collision warning is enabled, the ADAS system in the vehicle should
+     * warn the driver of potential collisions at low speeds. This property is different from the
+     * pre-existing FORWARD_COLLISION_WARNING_ENABLED, which should apply to higher speed
+     * applications only. If the vehicle doesn't have a separate collision detection system for low
+     * speed environments, this property should not be implemented.
+     *
+     * In general, LOW_SPEED_COLLISION_WARNING_ENABLED should always return true or false. If the
+     * feature is not available due to some temporary state, such as the vehicle speed being too
+     * high, that information must be conveyed through the ErrorState values in the
+     * LOW_SPEED_COLLISION_WARNING_STATE property.
+     *
+     * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
+     * implement it as VehiclePropertyAccess.READ only.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
+     */
+    LOW_SPEED_COLLISION_WARNING_ENABLED =
+            0x1021 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
+
+    /**
+     * Low Speed Collision Warning state.
+     *
+     * Returns the current state of Low Speed Collision Warning. This property must always return a
+     * valid state defined in LowSpeedCollisionWarningState or ErrorState. It must not surface
+     * errors through StatusCode and must use the supported error states instead. This property is
+     * different from the pre-existing FORWARD_COLLISION_WARNING_STATE, which should apply to higher
+     * speed applications only. If the vehicle doesn't have a separate collision detection system
+     * for low speed environments, this property should not be implemented.
+     *
+     * For the global area ID (0), the VehicleAreaConfig#supportedEnumValues array must be defined
+     * unless all states of both LowSpeedCollisionWarningState (including OTHER, which is not
+     * recommended) and ErrorState are supported.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     * @data_enum LowSpeedCollisionWarningState
+     * @data_enum ErrorState
+     */
+    LOW_SPEED_COLLISION_WARNING_STATE =
+            0x1022 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
+
+    /**
+     * Enable or disable Cross Traffic Monitoring.
+     *
+     * Set true to enable Cross Traffic Monitoring and false to disable Cross Traffic Monitoring.
+     * When Cross Traffic Monitoring is enabled, the ADAS system in the vehicle should be turned on
+     * and monitoring for potential sideways collisions.
+     *
+     * In general, CROSS_TRAFFIC_MONITORING_ENABLED should always return true or false. If the
+     * feature is not available due to some temporary state, such as the vehicle speed being too
+     * high, that information must be conveyed through the ErrorState values in the
+     * CROSS_TRAFFIC_MONITORING_STATE property.
+     *
+     * This property is defined as VehiclePropertyAccess.READ_WRITE, but OEMs have the option to
+     * implement it as VehiclePropertyAccess.READ only.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ_WRITE
+     * @access VehiclePropertyAccess.READ
+     */
+    CROSS_TRAFFIC_MONITORING_ENABLED =
+            0x1023 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.BOOLEAN,
+
+    /**
+     * Cross Traffic Monitoring warning state.
+     *
+     * Returns the current state of Cross Traffic Monitoring Warning. This property must always
+     * return a valid state defined in CrossTrafficMonitoringWarningState or ErrorState. It must not
+     * surface errors through StatusCode and must use the supported error states instead.
+     *
+     * For the global area ID (0), the VehicleAreaConfig#supportedEnumValues array must be defined
+     * unless all states of both CrossTrafficMonitoringWarningState (including OTHER, which is not
+     * recommended) and ErrorState are supported.
+     *
+     * @change_mode VehiclePropertyChangeMode.ON_CHANGE
+     * @access VehiclePropertyAccess.READ
+     * @data_enum CrossTrafficMonitoringWarningState
+     * @data_enum ErrorState
+     */
+    CROSS_TRAFFIC_MONITORING_WARNING_STATE =
+            0x1024 + VehiclePropertyGroup.SYSTEM + VehicleArea.GLOBAL + VehiclePropertyType.INT32,
 
     /***************************************************************************
      * End of ADAS Properties

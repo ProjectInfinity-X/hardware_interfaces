@@ -30,6 +30,7 @@
 #include <android/binder_auto_utils.h>
 #include <fmq/AidlMessageQueue.h>
 #include <gtest/gtest.h>
+#include <system/audio_aidl_utils.h>
 #include <system/audio_effects/aidl_effects_utils.h>
 #include <system/audio_effects/effect_uuid.h>
 
@@ -41,6 +42,7 @@ using namespace android;
 using aidl::android::hardware::audio::effect::CommandId;
 using aidl::android::hardware::audio::effect::Descriptor;
 using aidl::android::hardware::audio::effect::IEffect;
+using aidl::android::hardware::audio::effect::kEventFlagNotEmpty;
 using aidl::android::hardware::audio::effect::Parameter;
 using aidl::android::hardware::audio::effect::Range;
 using aidl::android::hardware::audio::effect::State;
@@ -50,6 +52,8 @@ using aidl::android::media::audio::common::AudioFormatDescription;
 using aidl::android::media::audio::common::AudioFormatType;
 using aidl::android::media::audio::common::AudioUuid;
 using aidl::android::media::audio::common::PcmType;
+using ::android::audio::utils::toString;
+using ::android::hardware::EventFlag;
 
 const AudioFormatDescription kDefaultFormatDescription = {
         .type = AudioFormatType::PCM, .pcm = PcmType::FLOAT_32_BIT, .encoding = ""};
@@ -61,6 +65,12 @@ typedef ::android::AidlMessageQueue<float,
                                     ::aidl::android::hardware::common::fmq::SynchronizedReadWrite>
         DataMQ;
 
+static inline std::string getPrefix(Descriptor& descriptor) {
+    std::string prefix = "Implementor_" + descriptor.common.implementor + "_name_" +
+                         descriptor.common.name + "_UUID_" + toString(descriptor.common.id.uuid);
+    return prefix;
+}
+
 class EffectHelper {
   public:
     static void create(std::shared_ptr<IFactory> factory, std::shared_ptr<IEffect>& effect,
@@ -69,7 +79,7 @@ class EffectHelper {
         auto& id = desc.common.id;
         ASSERT_STATUS(status, factory->createEffect(id.uuid, &effect));
         if (status == EX_NONE) {
-            ASSERT_NE(effect, nullptr) << id.uuid.toString();
+            ASSERT_NE(effect, nullptr) << toString(id.uuid);
         }
     }
 
@@ -145,12 +155,20 @@ class EffectHelper {
         buffer.resize(floatsToWrite);
         std::fill(buffer.begin(), buffer.end(), 0x5a);
     }
-    static void writeToFmq(std::unique_ptr<DataMQ>& mq, const std::vector<float>& buffer) {
-        const size_t available = mq->availableToWrite();
+    static void writeToFmq(std::unique_ptr<StatusMQ>& statusMq, std::unique_ptr<DataMQ>& dataMq,
+                           const std::vector<float>& buffer) {
+        const size_t available = dataMq->availableToWrite();
         ASSERT_NE(0Ul, available);
         auto bufferFloats = buffer.size();
         auto floatsToWrite = std::min(available, bufferFloats);
-        ASSERT_TRUE(mq->write(buffer.data(), floatsToWrite));
+        ASSERT_TRUE(dataMq->write(buffer.data(), floatsToWrite));
+
+        EventFlag* efGroup;
+        ASSERT_EQ(::android::OK,
+                  EventFlag::createEventFlag(statusMq->getEventFlagWord(), &efGroup));
+        ASSERT_NE(nullptr, efGroup);
+        efGroup->wake(kEventFlagNotEmpty);
+        ASSERT_EQ(::android::OK, EventFlag::deleteEventFlag(&efGroup));
     }
     static void readFromFmq(std::unique_ptr<StatusMQ>& statusMq, size_t statusNum,
                             std::unique_ptr<DataMQ>& dataMq, size_t expectFloats,
@@ -232,11 +250,11 @@ class EffectHelper {
                    maxLimit = std::numeric_limits<S>::max();
         if (s.size()) {
             const auto min = *s.begin(), max = *s.rbegin();
-            s.insert(min + (max - min) / 2);
-            if (min != minLimit) {
+            s.insert((min & max) + ((min ^ max) >> 1));
+            if (min > minLimit + 1) {
                 s.insert(min - 1);
             }
-            if (max != maxLimit) {
+            if (max < maxLimit - 1) {
                 s.insert(max + 1);
             }
         }
@@ -264,5 +282,33 @@ class EffectHelper {
             }
         }
         return functor(result);
+    }
+
+    static void processAndWriteToOutput(std::vector<float>& inputBuffer,
+                                        std::vector<float>& outputBuffer,
+                                        const std::shared_ptr<IEffect>& mEffect,
+                                        IEffect::OpenEffectReturn* mOpenEffectReturn) {
+        // Initialize AidlMessagequeues
+        auto statusMQ = std::make_unique<EffectHelper::StatusMQ>(mOpenEffectReturn->statusMQ);
+        ASSERT_TRUE(statusMQ->isValid());
+        auto inputMQ = std::make_unique<EffectHelper::DataMQ>(mOpenEffectReturn->inputDataMQ);
+        ASSERT_TRUE(inputMQ->isValid());
+        auto outputMQ = std::make_unique<EffectHelper::DataMQ>(mOpenEffectReturn->outputDataMQ);
+        ASSERT_TRUE(outputMQ->isValid());
+
+        // Enabling the process
+        ASSERT_NO_FATAL_FAILURE(command(mEffect, CommandId::START));
+        ASSERT_NO_FATAL_FAILURE(expectState(mEffect, State::PROCESSING));
+
+        // Write from buffer to message queues and calling process
+        EXPECT_NO_FATAL_FAILURE(EffectHelper::writeToFmq(statusMQ, inputMQ, inputBuffer));
+
+        // Read the updated message queues into buffer
+        EXPECT_NO_FATAL_FAILURE(EffectHelper::readFromFmq(statusMQ, 1, outputMQ,
+                                                          outputBuffer.size(), outputBuffer));
+
+        // Disable the process
+        ASSERT_NO_FATAL_FAILURE(command(mEffect, CommandId::RESET));
+        ASSERT_NO_FATAL_FAILURE(expectState(mEffect, State::IDLE));
     }
 };

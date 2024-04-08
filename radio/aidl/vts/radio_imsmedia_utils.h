@@ -76,16 +76,17 @@ class ImsMediaSessionListener : public BnImsMediaSessionListener {
     virtual ndk::ScopedAStatus onDtmfReceived(char16_t in_dtmfDigit,
                                               int32_t in_durationMs) override;
     virtual ndk::ScopedAStatus onCallQualityChanged(const CallQuality& in_callQuality) override;
+    virtual ndk::ScopedAStatus notifyRtpReceptionStats(const RtpReceptionStats& in_stats) override;
 };
 
 /* The main test class for Radio AIDL ImsMedia. */
-class RadioImsMediaTest : public ::testing::TestWithParam<std::string>, public RadioServiceTest {
+class RadioImsMediaTest : public RadioServiceTest {
   protected:
     virtual void verifyError(RtpError inError);
     virtual ndk::ScopedAStatus triggerOpenSession(int32_t sessionId);
 
   public:
-    virtual void SetUp() override;
+    void SetUp() override;
 
     /* radio imsmedia service handle */
     std::shared_ptr<IImsMedia> radio_imsmedia;

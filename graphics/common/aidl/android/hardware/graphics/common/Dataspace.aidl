@@ -23,11 +23,26 @@ enum Dataspace {
     /**
      * Default-assumption data space, when not explicitly specified.
      *
-     * It is safest to assume the buffer is an image with sRGB primaries and
-     * encoding ranges, but the consumer and/or the producer of the data may
-     * simply be using defaults. No automatic gamma transform should be
-     * expected, except for a possible display gamma transform when drawn to a
-     * screen.
+     * IAllocator implementations must not assume a particular dataspace interpretation when
+     * allocating a buffer. That is, the dataspace stored on a buffer's metadata must
+     * explicitly be UNKNOWN at the time of allocation. All other vendor implementations (for
+     * example, IComposer) are suggested to assume that the buffer is an image that conforms
+     * to the recommendations outlined by STANDARD_UNSPECIFIED, TRANSFER_UNSPECIFIED, and
+     * RANGE_UNSPECIFIED in order to avoid obviously-broken behavior.
+     *
+     * This means:
+     * - RGB buffers may be assumed to follow sRGB (IEC 61966-2.1)
+     * - YCbCr buffers smaller than 720p may be assumed to follow BT. 601-7
+     * - YCbCr buffers at least 720p may be assumed to follow BT. 709-6
+     * - Y buffers are full range with an undefined transfer and primaries
+     * - All other buffer formats may be treated in an implementation-defined manner
+     *
+     * It is the framework's - and application's - responsibility to communicate
+     * an accurate dataspace for any buffers throughout the system to guarantee
+     * well-defined behavior. For the framework, this means translating UNKNOWN
+     * dataspaces to a chosen default, and setting gralloc metadata on the buffer
+     * accordingly. For the application, this means signaling a defined dataspace
+     * to any framework apis.
      */
     UNKNOWN = 0x0,
 
@@ -544,6 +559,13 @@ enum Dataspace {
     ADOBE_RGB = 11 << 16 | 4 << 22 | 1 << 27, // STANDARD_ADOBE_RGB | TRANSFER_GAMMA2_2 | RANGE_FULL
 
     /**
+     * Adobe RGB LINEAR
+     *
+     * Use full range, linear transfer and Adobe RGB primaries
+     */
+    ADOBE_RGB_LINEAR = 11 << 16 | 1 << 22 | 1 << 27, // STANDARD_ADOBE_RGB | TRANSFER_LINEAR | RANGE_FULL
+
+    /**
      * ITU-R Recommendation 2020 (BT.2020)
      *
      * Ultra High-definition television
@@ -569,6 +591,15 @@ enum Dataspace {
      * Use full range, SMPTE 2084 (PQ) transfer and BT2020 standard
      */
     BT2020_PQ = 6 << 16 | 7 << 22 | 1 << 27, // STANDARD_BT2020 | TRANSFER_ST2084 | RANGE_FULL
+
+    /**
+     * ITU-R Recommendation 2020 (BT.2020)
+     *
+     * Ultra High-definition television
+     *
+     * Use extended range, linear transfer and BT2020 standard
+     */
+    BT2020_LINEAR_EXTENDED = 6 << 16 | 1 << 22 | 3 << 27, // STANDARD_BT2020 | TRANSFER_LINEAR | RANGE_EXTENDED
 
     /**
      * Data spaces for non-color formats
@@ -669,14 +700,16 @@ enum Dataspace {
     HEIF = 0x1004,
 
     /**
-     * ISO/IEC TBD
+     * Ultra HDR
      *
-     * JPEG image with embedded 10-bit recovery map following the Jpeg/R specification.
+     * JPEG image with embedded 10-bit recovery map following the Ultra HDR specification.
      *
      * This value must always remain aligned with the public ImageFormat Jpeg/R definition and is
      * valid with formats:
-     *    HAL_PIXEL_FORMAT_BLOB: JPEG image encoded by Jpeg/R encoder according to ISO/IEC TBD.
-     * The image contains a standard SDR JPEG and a recovery map. Jpeg/R decoders can use the
+     *    HAL_PIXEL_FORMAT_BLOB: JPEG image encoded by Ultra HDR encoder according to
+     *    the <a href="https://developer.android.com/guide/topics/media/hdr-image-format">
+     *    Ultra HDR Image format specification</a>.
+     * The image contains a standard SDR JPEG and a recovery map. Ultra HDR decoders can use the
      * map to recover the 10-bit input image.
      */
     JPEG_R = 0x1005,

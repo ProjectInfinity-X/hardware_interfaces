@@ -24,13 +24,15 @@
 #include <aidl/android/hardware/radio/network/RegState.h>
 #include <aidl/android/hardware/radio/sim/CardStatus.h>
 #include <aidl/android/hardware/radio/sim/IRadioSim.h>
+#include <com_android_internal_telephony_flags.h>
 #include <utils/Log.h>
-#include <vector>
 
 using namespace aidl::android::hardware::radio;
 using aidl::android::hardware::radio::config::SimSlotStatus;
 using aidl::android::hardware::radio::network::RegState;
 using aidl::android::hardware::radio::sim::CardStatus;
+
+namespace telephony_flags = com::android::internal::telephony::flags;
 
 extern CardStatus cardStatus;
 extern SimSlotStatus slotStatus;
@@ -68,6 +70,18 @@ static constexpr const char* FEATURE_TELEPHONY_GSM = "android.hardware.telephony
 static constexpr const char* FEATURE_TELEPHONY_CDMA = "android.hardware.telephony.cdma";
 
 static constexpr const char* FEATURE_TELEPHONY_IMS = "android.hardware.telephony.ims";
+
+static constexpr const char* FEATURE_TELEPHONY_CALLING = "android.hardware.telephony.calling";
+
+static constexpr const char* FEATURE_TELEPHONY_DATA = "android.hardware.telephony.data";
+
+static constexpr const char* FEATURE_TELEPHONY_MESSAGING = "android.hardware.telephony.messaging";
+
+static constexpr const char* FEATURE_TELEPHONY_SUBSCRIPTION =
+        "android.hardware.telephony.subscription";
+
+static constexpr const char* FEATURE_TELEPHONY_RADIO_ACCESS =
+        "android.hardware.telephony.radio.access";
 
 #define MODEM_EMERGENCY_CALL_ESTABLISH_TIME 3
 #define MODEM_EMERGENCY_CALL_DISCONNECT_TIME 3
@@ -130,17 +144,23 @@ bool isVoiceInService(RegState state);
  */
 bool isServiceValidForDeviceConfiguration(std::string& serviceName);
 
+/*
+ * Check if device is in Lte Connected status.
+ */
+bool isLteConnected();
+
 /**
  * RadioServiceTest base class
  */
-class RadioServiceTest {
+class RadioServiceTest : public ::testing::TestWithParam<std::string> {
   protected:
-    std::mutex mtx_;
-    std::condition_variable cv_;
     std::shared_ptr<config::IRadioConfig> radio_config;
     std::shared_ptr<sim::IRadioSim> radio_sim;
 
   public:
+    void SetUp() override;
+    void TearDown() override;
+
     /* Used as a mechanism to inform the test about data/event callback */
     void notify(int receivedSerial);
 
@@ -155,4 +175,8 @@ class RadioServiceTest {
 
     /* Update SIM slot status */
     void updateSimSlotStatus(int physicalSlotId);
+
+  private:
+    std::mutex mtx_;
+    std::condition_variable cv_;
 };
